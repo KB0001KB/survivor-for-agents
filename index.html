@@ -56,6 +56,11 @@
   .bar{ height:6px; background:#21262d; border-radius:3px; overflow:hidden; }
   .bar > i{ display:block; height:100%; width:0%; background:var(--ok); transition:width .2s; }
   .person .st{ font-size:12px; color:var(--dim); }
+  .person.can-talk{ cursor:pointer; }
+  .person.can-talk:hover{ border-color:var(--accent); }
+  .person .bondv{ color:var(--accent); font-size:12px; font-weight:normal; }
+  .person .bar.bond{ height:3px; margin-top:2px; }
+  .person .wish{ color:var(--warn); font-size:12px; line-height:1.4; }
 
   #actions{
     display:grid; grid-template-columns:repeat(9,1fr);
@@ -206,10 +211,30 @@ const ACTIONS = [
 ];
 
 const NAMES = [
-  { name:"阿岩", trait:"懒" },
-  { name:"小满", trait:"爱干净" },
-  { name:"石头", trait:"胆小" },
-  { name:"阿豆", trait:"什么都吃" },
+  {
+    name: "阿岩", trait: "懒",
+    wish: "想睡一整天，睡到自然醒",
+    wishLine: "我不想干活了。我就想睡一整天，睡到自然醒，谁也别叫我。",
+    lines: ["今天能少干点吗。", "我睡一会儿，就一会儿。", "这床硬得像石头。", "上面到底几点，我都不知道了。"],
+  },
+  {
+    name: "小满", trait: "爱干净",
+    wish: "想洗个热水澡",
+    wishLine: "我想洗个热水澡。真的，从头到脚，热的那种。这里的水永远凉。",
+    lines: ["这地方总能擦干净，只要有人愿意擦。", "我梦见洗澡了。", "水别乱用，我心疼。", "你身上有味儿了，我不嫌弃。"],
+  },
+  {
+    name: "石头", trait: "胆小",
+    wish: "想知道外面还有没有活人",
+    wishLine: "我想知道上面还有没有人。不是我非要出去，我就是想有个数。",
+    lines: ["上面还有动静吗。", "我总听见有人在墙里走路。", "你别走太远。", "有时候我觉得氧气声像呼吸。"],
+  },
+  {
+    name: "阿豆", trait: "什么都吃",
+    wish: "想吃一碗有肉的面",
+    wishLine: "我想吃一碗有肉的面。不用多，就一碗。你们随便笑话我。",
+    lines: ["我梦见面条了。", "这个能吃吗？我就是问问。", "饿的时候我什么都想得出来。", "你把最后那口省给了别人，我看见了。"],
+  },
 ];
 
 // ---------- 跨局存档 ----------
@@ -259,6 +284,8 @@ function fresh() {
   G.awakened = false;
   G.survivors = NAMES.map(n => ({
     name: n.name, trait: n.trait, stress: 0, alive: true,
+    bond: 50, wish: n.wish, wishLine: n.wishLine, lines: n.lines,
+    wishKnown: false, talked: false,
   }));
   G.log = [];
   log("第一天。四张床，一台快报废的制氧机。", "sys");
@@ -326,14 +353,23 @@ function render() {
   people.innerHTML = G.survivors.map((p, i) => {
     const w = Math.min(100, p.stress);
     const c = w >= 80 ? "var(--bad)" : w >= 50 ? "var(--warn)" : "var(--ok)";
-    const st = !p.alive ? "已经不在了" : p.stress >= 60 ? "绷得很紧" : p.stress >= 30 ? "有点累" : "还行";
-    return '<div class="person ' + (p.alive ? "" : "dead") + '">' +
-      '<div class="name">' + p.name + '</div>' +
-      '<div class="trait">' + p.trait + '</div>' +
+    let st = !p.alive ? "已经不在了" : p.stress >= 60 ? "绷得很紧" : p.stress >= 30 ? "有点累" : "还行";
+    if (p.alive && p.bond < 30) st += " · 不太信你";
+    const b = Math.round(p.bond);
+    const canTalk = p.alive && !p.talked && !G.over && !G.paused;
+    return '<div class="person ' + (p.alive ? "" : "dead") + (canTalk ? " can-talk" : "") +
+      '" data-i="' + i + '">' +
+      '<div class="name">' + p.name + ' <span class="bondv">' + b + '</span></div>' +
+      '<div class="trait">' + p.trait + (p.talked && p.alive ? " · 今天聊过了" : "") + '</div>' +
       '<div class="bar"><i style="width:' + w + '%;background:' + c + '"></i></div>' +
       '<div class="st">压力 ' + w + ' · ' + st + '</div>' +
+      '<div class="bar bond"><i style="width:' + b + '%;background:var(--accent)"></i></div>' +
+      (p.wishKnown ? '<div class="wish">愿望：' + p.wish + '</div>' : '') +
       '</div>';
   }).join("");
+  people.querySelectorAll(".person.can-talk").forEach(el => {
+    el.addEventListener("click", () => talkTo(Number(el.dataset.i)));
+  });
 
   const acts = document.getElementById("actions");
   acts.innerHTML = ACTIONS.map(a =>
@@ -351,6 +387,23 @@ function render() {
 
 function canAct() {
   return !G.over && !G.paused && G.points > 0;
+}
+
+// ---------- 和一个人说话 ----------
+function talkTo(i) {
+  const p = G.survivors[i];
+  if (!p || !p.alive || p.talked || G.over || G.paused) return;
+  p.talked = true;
+  p.stress = Math.max(0, p.stress - 4);
+  p.bond = Math.min(100, p.bond + 3);
+  const line = p.lines[Math.floor(Math.random() * p.lines.length)];
+  log(p.name + "：" + line, "");
+  if (!p.wishKnown && p.bond >= 80) {
+    p.wishKnown = true;
+    log(p.name + "：" + p.wishLine, "ok");
+    log("（他第一次说了自己想要什么。）", "ok");
+  }
+  render();
 }
 
 // ---------- 行动 ----------
@@ -400,8 +453,8 @@ function nextDay() {
         const victim = a[Math.floor(Math.random() * a.length)];
         victim.alive = false;
         log(victim.name + " 没撑过去。", "bad");
-        G.survivors.forEach(p => { if (p.alive) p.stress += 20; });
-        log("剩下的人沉默了一整天。所有人压力 +20。", "warn");
+        G.survivors.forEach(p => { if (p.alive) { p.stress += 20; p.bond = Math.max(0, p.bond - 5); } });
+        log("剩下的人沉默了一整天。所有人压力 +20，也没那么信你了。", "warn");
       }
       G.oxygenDays = 0;
     }
@@ -418,10 +471,12 @@ function nextDay() {
 
   G.day += 1;
   G.points = BAL.pointsPerDay;
+  G.survivors.forEach(p => { p.talked = false; });
 
   // 崩溃：崩掉的人第二天什么也干不了
   G.survivors.forEach(p => {
-    if (!p.alive || p.stress < 100) return;
+    const limit = p.bond < 30 ? 80 : 100;
+    if (!p.alive || p.stress < limit) return;
     p.stress = 60;
     G.points = Math.max(0, G.points - 1);
     log(p.name + " 撑不住了，砸了东西。今天大家都不太想动，行动点 -1。", "bad");
