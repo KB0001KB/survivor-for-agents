@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幸存者</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#30363d;
+    --text:#c9d1d9; --dim:#8b949e; --accent:#58a6ff;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Consolas","Courier New",monospace;
+    font-size:14px; line-height:1.5;
+    user-select:none; overflow:hidden;
+  }
+
+  #bar{
+    height:44px; display:flex; align-items:center; gap:18px;
+    padding:0 12px; background:var(--panel);
+    border-bottom:1px solid var(--line);
+  }
+  .res{display:flex; align-items:baseline; gap:6px; min-width:96px;}
+  .res .k{color:var(--dim); font-size:12px;}
+  .res .v{font-size:15px; font-weight:bold;}
+  .v.ok{color:var(--ok);} .v.warn{color:var(--warn);} .v.bad{color:var(--bad);}
+
+  #pause{
+    margin-left:auto; width:32px; height:32px; flex:none;
+    background:#21262d; border:1px solid var(--line); color:var(--text);
+    border-radius:4px; cursor:pointer; font-size:14px;
+  }
+  #pause:hover{background:#30363d;}
+
+  #meta{
+    height:34px; display:flex; align-items:center; gap:20px;
+    padding:0 12px; background:#0f141b;
+    border-bottom:1px solid var(--line); color:var(--dim); font-size:13px;
+  }
+  #points{color:var(--accent);}
+
+  #people{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    gap:10px; padding:12px; height:190px;
+  }
+  .person{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:6px;
+  }
+  .person.dead{opacity:.35;}
+  .person .name{font-size:15px; font-weight:bold;}
+  .person .trait{ color:var(--dim); font-size:12px; }
+  .bar{ height:6px; background:#21262d; border-radius:3px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; width:0%; background:var(--ok); transition:width .2s; }
+  .person .st{ font-size:12px; color:var(--dim); }
+
+  #actions{
+    display:grid; grid-template-columns:repeat(9,1fr);
+    gap:8px; padding:0 12px 12px;
+  }
+  button.act, #next{
+    height:52px; background:#21262d; border:1px solid var(--line);
+    color:var(--text); border-radius:6px; cursor:pointer;
+    font-family:inherit; font-size:13px;
+  }
+  button.act:hover:not(:disabled), #next:hover{background:#30363d; border-color:var(--accent);}
+  button.act:disabled, #next:disabled{opacity:.35; cursor:not-allowed;}
+  button.act small{display:block; color:var(--dim); font-size:11px; margin-top:2px;}
+
+  #next{
+    width:100%; height:44px; margin:0 12px 12px; width:calc(100% - 24px);
+    border-color:var(--accent); color:var(--accent); font-size:15px;
+  }
+
+  #log{
+    margin:0 12px 12px; height:calc(100vh - 44px - 34px - 190px - 52px - 44px - 60px);
+    min-height:120px; overflow-y:auto;
+    background:#0b0f14; border:1px solid var(--line); border-radius:6px;
+    padding:10px; font-size:12.5px; line-height:1.7;
+  }
+  #log div{border-bottom:1px solid #141a21; padding:2px 0;}
+  #log .t{color:var(--dim); margin-right:8px;}
+  #log .bad{color:var(--bad);} #log .ok{color:var(--ok);} #log .warn{color:var(--warn);}
+  #log .sys{color:var(--accent);}
+
+  #over{
+    position:fixed; inset:0; background:rgba(0,0,0,.82);
+    display:none; align-items:center; justify-content:center;
+  }
+  #over.show{display:flex;}
+  #over .box{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:28px 36px; text-align:center; max-width:520px;
+  }
+  #over h2{font-size:20px; margin-bottom:12px;}
+  #over p{color:var(--dim); margin-bottom:18px; line-height:1.8;}
+  #over button{
+    background:#21262d; border:1px solid var(--accent); color:var(--accent);
+    border-radius:6px; padding:8px 20px; cursor:pointer; font-family:inherit;
+  }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="res"><span class="k">氧气</span><span class="v" id="r-oxygen">100</span></div>
+  <div class="res"><span class="k">水</span><span class="v" id="r-water">100</span></div>
+  <div class="res"><span class="k">食物</span><span class="v" id="r-food">100</span></div>
+  <div class="res"><span class="k">电力</span><span class="v" id="r-power">100</span></div>
+  <div class="res"><span class="k">材料</span><span class="v" id="r-material">200</span></div>
+  <div class="res"><span class="k">士气</span><span class="v" id="r-morale">100</span></div>
+  <button id="pause" title="暂停">⏸</button>
+</div>
+
+<div id="meta">
+  <span>第 <b id="day">1</b> 天</span>
+  <span>行动点 <b id="points">4</b></span>
+  <span id="tech"></span>
+  <span id="hint"></span>
+</div>
+
+<div id="people"></div>
+
+<div id="actions"></div>
+
+<button id="next">结束今天</button>
+
+<div id="log"></div>
+
+<div id="over"><div class="box">
+  <h2 id="over-title"></h2>
+  <p id="over-text"></p>
+  <button onclick="location.reload()">再来一局</button>
+</div></div>
+
+<script>
+"use strict";
+
+// ---------- 可调数值，全在这儿 ----------
+const BAL = {
+  start: { oxygen: 100, water: 100, food: 100, power: 100, material: 200, morale: 100 },
+  drain: { oxygen: 25, water: 22, food: 25, power: 15 },
+  stressPerDay: 5,
+  pointsPerDay: 4,
+  deathOxygenDays: 2,
+  techPerLevel: 3,
+  revealAt: 24,
+};
+
+const ACTIONS = [
+  { id:"oxy",  name:"修氧机", sub:"+30 氧 / -10 材料 / -8 电", run(s){
+      const gain = 30 + (G.techLevel >= 1 ? 10 : 0);
+      s.oxygen += gain; s.material -= 10; s.power -= 8;
+      return "修了氧机，氧气 +" + gain + "，材料 -10，电力 -8";
+  }},
+  { id:"farm", name:"种植", sub:"+30 食物 / -8 水", run(s){
+      s.food += 30; s.water -= 8;
+      return "种了一批，食物 +30，水 -8";
+  }},
+  { id:"water",name:"打水", sub:"+30 水 / -6 电", run(s){
+      s.water += 30; s.power -= 6;
+      return "打了水，水 +30，电力 -6";
+  }},
+  { id:"power",name:"发电", sub:"+30 电 / -15 材料", run(s){
+      const gain = 30 + (G.techLevel >= 2 ? 10 : 0);
+      s.power += gain; s.material -= 15;
+      return "烧料发电，电力 +" + gain + "，材料 -15";
+  }},
+  { id:"mine", name:"挖矿", sub:"+40 材料 / 全员压力 +8", run(s, g){
+      s.material += 40;
+      g.survivors.forEach(p => { if (p.alive) p.stress += 8; });
+      return "挖矿，材料 +40，所有人压力 +8";
+  }},
+  { id:"rest", name:"休息", sub:"一人 -25 压力", run(s, g){
+      const p = g.mostStressed();
+      if (!p) return "没人需要休息";
+      p.stress = Math.max(0, p.stress - 25);
+      return p.name + " 去躺了一会儿，压力 -25";
+  }},
+  { id:"talk", name:"聊天", sub:"全员 -10 压力", run(s, g){
+      g.survivors.forEach(p => { if (p.alive) p.stress = Math.max(0, p.stress - 10); });
+      return "大家凑在一起说了会儿话，所有人压力 -10";
+  }},
+  { id:"apply",name:"应用研究", sub:"-15 材料 / +1 科技", run(s){
+      s.material -= 15;
+      G.tech += 1;
+      const need = BAL.techPerLevel;
+      if (G.tech >= need && G.techLevel < 3) {
+        G.tech -= need;
+        G.techLevel += 1;
+        const what = ["修氧机效率提升", "发电机效率提升", "每日消耗降低"][G.techLevel - 1];
+        return "改成了一版设计：" + what + "。（科技 " + G.techLevel + " 级）";
+      }
+      return "拆了改、改了拆，攒了点东西。科技 +1（" + G.tech + "/" + need + "）";
+  }},
+  { id:"study",name:"基础理论", sub:"-12 材料", run(s){
+      s.material -= 12;
+      G.theory += 1;
+      G.theoryTotal += 1;
+      saveGame();
+      return "在「基础理论」上花了点时间。没什么用，也看不出进展。";
+  }},
+];
+
+const NAMES = [
+  { name:"阿岩", trait:"懒" },
+  { name:"小满", trait:"爱干净" },
+  { name:"石头", trait:"胆小" },
+  { name:"阿豆", trait:"什么都吃" },
+];
+
+// ---------- 跨局存档 ----------
+const SAVE_KEY = "survival.save.v1";
+
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+
+function saveGame() {
+  try {
+    const s = loadSave();
+    s.theoryTotal = G.theoryTotal;
+    s.runs = G.runs;
+    s.awakened = G.awakened;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+  } catch (e) { /* file:// 下可能被禁，忽略 */ }
+}
+
+// ---------- 状态 ----------
+const SAVE = loadSave();
+
+const G = {
+  day: 1,
+  paused: false,
+  points: BAL.pointsPerDay,
+  theory: 0,
+  theoryTotal: SAVE.theoryTotal || 0,
+  tech: 0,
+  techLevel: 0,
+  runs: SAVE.runs || [],
+  awakened: false,
+  oxygenDays: 0,
+  survivors: [],
+  over: false,
+};
+
+function fresh() {
+  G.day = 1;
+  G.paused = false;
+  G.points = BAL.pointsPerDay;
+  G.theory = 0;
+  G.tech = 0;
+  G.techLevel = 0;
+  G.oxygenDays = 0;
+  G.awakened = false;
+  G.survivors = NAMES.map(n => ({
+    name: n.name, trait: n.trait, stress: 0, alive: true,
+  }));
+  G.log = [];
+  log("第一天。四张床，一台快报废的制氧机。", "sys");
+  if (G.theoryTotal > 0) {
+    log("（这本书上记着 " + G.theoryTotal + " 条没写完的笔记。）", "sys");
+  }
+}
+
+function res() { return G.res; }
+
+function alive() { return G.survivors.filter(p => p.alive); }
+
+function mostStressed() {
+  const a = alive();
+  if (!a.length) return null;
+  return a.reduce((x, y) => (y.stress > x.stress ? y : x));
+}
+
+// ---------- 日志 ----------
+function log(text, cls) {
+  G.log.push({ day: G.day, text, cls: cls || "" });
+  renderLog();
+}
+
+function renderLog() {
+  const el = document.getElementById("log");
+  el.innerHTML = G.log.slice(-200).map(l =>
+    '<div><span class="t">D' + l.day + '</span><span class="' + l.cls + '">' +
+    escapeHtml(l.text) + "</span></div>"
+  ).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+}
+
+// ---------- 渲染 ----------
+function clampAll() {
+  const s = G.res;
+  for (const k of Object.keys(s)) {
+    s[k] = Math.max(0, Math.min(999, Math.round(s[k])));
+  }
+}
+
+function colorOf(v) {
+  if (v <= 15) return "bad";
+  if (v <= 35) return "warn";
+  return "ok";
+}
+
+function render() {
+  const s = G.res;
+  for (const k of ["oxygen","water","food","power","material","morale"]) {
+    const el = document.getElementById("r-" + k);
+    el.textContent = s[k];
+    el.className = "v " + (k === "material" ? "" : colorOf(s[k]));
+  }
+  document.getElementById("day").textContent = G.day;
+  document.getElementById("points").textContent = G.points;
+  document.getElementById("tech").textContent =
+    "科技 " + G.techLevel + " 级" + (G.tech > 0 ? "（" + G.tech + "/" + BAL.techPerLevel + "）" : "");
+
+  const people = document.getElementById("people");
+  people.innerHTML = G.survivors.map((p, i) => {
+    const w = Math.min(100, p.stress);
+    const c = w >= 80 ? "var(--bad)" : w >= 50 ? "var(--warn)" : "var(--ok)";
+    const st = !p.alive ? "已经不在了" : p.stress >= 60 ? "绷得很紧" : p.stress >= 30 ? "有点累" : "还行";
+    return '<div class="person ' + (p.alive ? "" : "dead") + '">' +
+      '<div class="name">' + p.name + '</div>' +
+      '<div class="trait">' + p.trait + '</div>' +
+      '<div class="bar"><i style="width:' + w + '%;background:' + c + '"></i></div>' +
+      '<div class="st">压力 ' + w + ' · ' + st + '</div>' +
+      '</div>';
+  }).join("");
+
+  const acts = document.getElementById("actions");
+  acts.innerHTML = ACTIONS.map(a =>
+    '<button class="act" data-id="' + a.id + '"' + (canAct() ? "" : " disabled") + '>' +
+    a.name + '<small>' + a.sub + '</small></button>'
+  ).join("");
+  acts.querySelectorAll("button").forEach(b => {
+    b.addEventListener("click", () => doAction(b.dataset.id));
+  });
+
+  document.getElementById("next").disabled = G.over || G.paused;
+  document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
+  document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
+}
+
+function canAct() {
+  return !G.over && !G.paused && G.points > 0;
+}
+
+// ---------- 行动 ----------
+function doAction(id) {
+  if (!canAct()) return;
+  const a = ACTIONS.find(x => x.id === id);
+  if (!a) return;
+  const text = a.run(G.res, G);
+  G.points -= 1;
+  clampAll();
+  log(text, a.id === "study" ? "sys" : "");
+  render();
+}
+
+// ---------- 一天结束 ----------
+function nextDay() {
+  if (G.over || G.paused) return;
+
+  if (!G.awakened && G.theoryTotal >= BAL.revealAt) awaken();
+
+  const s = G.res;
+  const n = alive().length;
+  const mult = G.awakened ? 0.3 : (G.techLevel >= 3 ? 0.85 : 1);
+
+  s.oxygen -= BAL.drain.oxygen * mult;
+  s.water  -= BAL.drain.water * mult;
+  s.food   -= BAL.drain.food * mult;
+  s.power  -= BAL.drain.power * mult;
+
+  if (s.water < 30) s.food -= 5;
+  if (s.power < 20) s.oxygen -= 5;
+
+  G.survivors.forEach(p => { if (p.alive) p.stress += BAL.stressPerDay; });
+  if (s.water < 20 || s.food < 20) {
+    G.survivors.forEach(p => { if (p.alive) p.stress += 6; });
+  }
+
+  clampAll();
+
+  // 崩溃
+  G.survivors.forEach(p => {
+    if (!p.alive || p.stress < 100) return;
+    p.stress = 60;
+    G.points = Math.max(0, G.points);
+    log(p.name + " 撑不住了，砸了东西，今天什么都干不了。", "bad");
+  });
+
+  // 缺氧
+  if (s.oxygen <= 0) {
+    G.oxygenDays += 1;
+    log("氧气见底了（第 " + G.oxygenDays + " 天）。", "bad");
+    if (G.oxygenDays >= BAL.deathOxygenDays) {
+      const a = alive();
+      if (a.length) {
+        const victim = a[Math.floor(Math.random() * a.length)];
+        victim.alive = false;
+        log(victim.name + " 没撑过去。", "bad");
+        G.survivors.forEach(p => { if (p.alive) p.stress += 20; });
+        log("剩下的人沉默了一整天。所有人压力 +20。", "warn");
+      }
+      G.oxygenDays = 0;
+    }
+  } else {
+    G.oxygenDays = 0;
+  }
+
+  // 虚弱
+  const a = alive();
+  if (a.length === 0) {
+    end("全灭了", "最后一天是第 " + G.day + " 天。氧气归零，没有人活下来。");
+    return;
+  }
+
+  G.day += 1;
+  G.points = BAL.pointsPerDay;
+
+  if (s.food <= 0) {
+    log("没吃的了。所有人压力 +15。", "bad");
+    G.survivors.forEach(p => { if (p.alive) p.stress += 15; });
+  }
+
+  render();
+}
+
+function awaken() {
+  G.awakened = true;
+  saveGame();
+  log("那天早上，制氧机的读数自己稳住了。没人去修，它就是稳住了。", "sys");
+  log("水不掉了，粮食在往外堆。外面还是黑的，但屋里开始像能住的地方。", "sys");
+  log("到这一步，才有人明白那些笔记到底在写什么。", "sys");
+  if (G.runs.length) {
+    G.runs.forEach(function (r, i) {
+      log("第 " + (i + 1) + " 局，第 " + r.day + " 天，" + r.why + "，走了 " + r.dead + " 个人。—— 他们等到了。", "ok");
+    });
+  } else {
+    log("这一次是第一次。没有人等过。", "ok");
+  }
+}
+
+function end(title, text) {
+  G.over = true;
+  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title });
+  saveGame();
+  document.getElementById("over-title").textContent = title;
+  document.getElementById("over-text").textContent = text;
+  document.getElementById("over").classList.add("show");
+  render();
+}
+
+// ---------- 暂停 ----------
+document.getElementById("pause").addEventListener("click", () => {
+  G.paused = !G.paused;
+  render();
+});
+
+document.getElementById("next").addEventListener("click", nextDay);
+
+// ---------- 启动 ----------
+G.res = Object.assign({}, BAL.start);
+fresh();
+render();
+</script>
+</body>
+</html>
