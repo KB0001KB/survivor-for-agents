@@ -390,14 +390,6 @@ function nextDay() {
 
   clampAll();
 
-  // 崩溃
-  G.survivors.forEach(p => {
-    if (!p.alive || p.stress < 100) return;
-    p.stress = 60;
-    G.points = Math.max(0, G.points);
-    log(p.name + " 撑不住了，砸了东西，今天什么都干不了。", "bad");
-  });
-
   // 缺氧
   if (s.oxygen <= 0) {
     G.oxygenDays += 1;
@@ -426,6 +418,14 @@ function nextDay() {
 
   G.day += 1;
   G.points = BAL.pointsPerDay;
+
+  // 崩溃：崩掉的人第二天什么也干不了
+  G.survivors.forEach(p => {
+    if (!p.alive || p.stress < 100) return;
+    p.stress = 60;
+    G.points = Math.max(0, G.points - 1);
+    log(p.name + " 撑不住了，砸了东西。今天大家都不太想动，行动点 -1。", "bad");
+  });
 
   if (s.food <= 0) {
     log("没吃的了。所有人压力 +15。", "bad");
