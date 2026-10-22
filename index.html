@@ -654,6 +654,28 @@ const SCENE = {
 // 四个人的衣服颜色，跟名字顺序走。不掉色——压力大小看姿态和汗。
 const CLOTH = ["#3f6f9e", "#4f8a63", "#a8763a", "#6f5f9e"];
 
+// 站在哪个工位，就摆哪个姿势。静态的，到位就切，不用一直动。
+// 角度是 SVG rotate(角度, 原点x, 原点y)。躯干绕腰转，手臂绕肩转。
+const POSE = {
+  oxygen: { torso: 5,  l: 108, r: -18 },   // 一只手举过头，够上面的阀门
+  farm:   { torso: 26, l: 28,  r: -28 },   // 弯着腰，两只手往地里
+  water:  { torso: 18, l: 18,  r: -18 },   // 弯下去提桶
+  power:  { torso: -6, l: 78,  r: -78 },   // 双手前上方拉着
+  mine:   { torso: 8,  l: 16,  r: -138 },  // 一只手把镐举过肩
+};
+
+function applyPose(g, post) {
+  const t = g.querySelector(".torso");
+  const al = g.querySelector(".armL");
+  const ar = g.querySelector(".armR");
+  if (!t || !al || !ar) return;
+  const p = POSE[post];
+  if (!p) { t.removeAttribute("transform"); al.removeAttribute("transform"); ar.removeAttribute("transform"); return; }
+  t.setAttribute("transform", "rotate(" + p.torso + " 0 -16)");
+  al.setAttribute("transform", "rotate(" + p.l + " -11 -46)");
+  ar.setAttribute("transform", "rotate(" + p.r + " 11 -46)");
+}
+
 function lastBubble() {
   for (let i = G.log.length - 1; i >= 0; i--) {
     const l = G.log[i];
@@ -687,15 +709,19 @@ function buildScene() {
       '<g class="bob">' +
         '<ellipse cx="0" cy="3" rx="16" ry="4" fill="#000" opacity=".45"/>' +
         '<path class="lg" d="M-6 -15 V-2 M6 -15 V-2" stroke="#39414c" stroke-width="6" stroke-linecap="round"/>' +
+        '<g class="torso">' +
         '<path class="bd" d="M-12 -50 Q-15 -22 -11 -16 L11 -16 Q15 -22 12 -50 Q0 -55 -12 -50 Z" ' +
           'stroke="#1b2027" stroke-width="1.4" stroke-linejoin="round"/>' +
-        '<path d="M-11 -46 Q-18 -36 -16 -27" stroke="#39414c" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
-        '<path d="M11 -46 Q18 -36 16 -27" stroke="#39414c" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
+        '<g class="armL"><path d="M-11 -46 Q-20 -34 -21 -18" stroke="#39414c" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
+          '<circle cx="-21" cy="-17" r="3" fill="#c9a27c" stroke="#1b2027" stroke-width="1.2"/></g>' +
+        '<g class="armR"><path d="M11 -46 Q20 -34 21 -18" stroke="#39414c" stroke-width="5.5" fill="none" stroke-linecap="round"/>' +
+          '<circle cx="21" cy="-17" r="3" fill="#c9a27c" stroke="#1b2027" stroke-width="1.2"/></g>' +
         '<circle class="hd" cx="0" cy="-62" r="12.5" stroke="#1b2027" stroke-width="1.4"/>' +
         '<path d="M-12.5 -63 Q-12 -78.5 0 -78.5 Q12 -78.5 12.5 -63 Q7 -71 0 -70 Q-7 -71 -12.5 -63 Z" fill="#24282e"/>' +
         '<ellipse cx="-4.3" cy="-61" rx="1.5" ry="2.1" fill="#12161b"/>' +
         '<ellipse cx="4.3" cy="-61" rx="1.5" ry="2.1" fill="#12161b"/>' +
         '<path class="sw" d="M10 -71 q 3.2 4.4 0 6.4 q -3.2 -2 0 -6.4 Z" fill="#58a6ff"/>' +
+        '</g>' +
       '</g>' +
       '<g id="bed' + i + '" style="display:none" opacity=".32">' +
         '<rect x="-30" y="-12" width="60" height="9" rx="3" fill="#252d38"/>' +
@@ -831,6 +857,7 @@ function updateScene() {
       bed.style.display = "";
       nm.textContent = who.left ? "走了" : "空床";
       nm.setAttribute("fill", "#4b5563");
+      applyPose(g, null);
       art.style.transform = "scale(1.22)";
       g.style.transform = "translate(" + x + "px," + G0 + "px)";
       return;
@@ -845,6 +872,7 @@ function updateScene() {
     g.querySelector(".bd").setAttribute("fill", CLOTH[i % CLOTH.length]);
     g.querySelector(".hd").setAttribute("fill", st >= 80 ? "#b9735a" : st >= 60 ? "#cfa87f" : "#c9a27c");
     g.classList.toggle("hot", st >= 60);
+    applyPose(g, posts[i]);
     art.style.transform = "rotate(" + lean + "deg) scale(1.22)";
     g.style.transform = "translate(" + x + "px," + G0 + "px)";
   });
