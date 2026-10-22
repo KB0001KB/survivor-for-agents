@@ -158,8 +158,8 @@
 
   #choice{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
-    display:none; align-items:center; justify-content:center;
-    z-index:30;
+    display:none; align-items:flex-start; justify-content:center;
+    padding-top:20px; z-index:30;
   }
   #choice.show{ display:flex; }
   #choice .box{
@@ -176,9 +176,11 @@
   #choice .choices button:hover{ border-color:var(--accent); }
   #choice .choices small{ display:block; color:var(--dim); font-size:11px; margin-top:4px; }
   #choice .cancel{
-    background:none; border:none; color:var(--dim); cursor:pointer; font-family:inherit;
-    text-decoration:underline;
+    display:block; width:100%; margin-top:4px;
+    background:#21262d; border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:10px; cursor:pointer; font-family:inherit; font-size:13px;
   }
+  #choice .cancel:hover{ border-color:var(--accent); }
   #choice .restart{
     display:block; width:100%; margin-bottom:10px;
     background:none; border:1px solid #4a2a2a; color:#a06060;
@@ -275,7 +277,7 @@
   <span>行动点 <b id="points">4</b></span>
   <span id="tech"></span>
   <span id="hint"></span>
-  <button id="quit">宣布结束</button>
+  <button id="quit">结束这一局</button>
 </div>
 
 <div id="people"></div>
@@ -293,7 +295,7 @@
 <div id="tip"></div>
 
 <div id="choice"><div class="box">
-  <h2>宣布结束</h2>
+  <h2>结束这一局</h2>
   <p>这不是失败。选一种收尾就行。</p>
   <div class="choices">
     <button data-c="evac">撤离<small>带一部分人走（40 电 / 60 材料）</small></button>
