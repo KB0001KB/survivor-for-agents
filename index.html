@@ -538,6 +538,7 @@ function fresh() {
   G.lastOneLogged = false;
   G.rollCallPending = false;
   G.awakened = false;
+  G.posts = [null, null, null, null];
   // 每次从池子里抽四个，不是固定的那几位
   const picked = NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
   G.survivors = picked.map(n => ({
@@ -564,6 +565,7 @@ function saveRun() {
       theory: G.theory, tech: G.tech, techLevel: G.techLevel,
       oxygenDays: G.oxygenDays, foodDays: G.foodDays, waterDays: G.waterDays,
       rollCallPending: G.rollCallPending, lastOneLogged: G.lastOneLogged, awakened: G.awakened,
+      posts: G.posts,
       log: G.log.slice(-120),
       over: G.over,
     }));
@@ -590,6 +592,7 @@ function loadRun() {
     G.rollCallPending = !!d.rollCallPending;
     G.lastOneLogged = !!d.lastOneLogged;
     G.awakened = !!d.awakened;
+    G.posts = Array.isArray(d.posts) ? d.posts : [null, null, null, null];
     G.log = d.log || [];
     G.over = false;
     return true;
@@ -640,7 +643,13 @@ function escapeHtml(s) {
 }
 
 // ---------- 场景（只给人看，不参与判定） ----------
-const SCENE = { GROUND: 290, xs: [245, 480, 700, 930] };
+// 结构建一次，之后只改属性。这样 CSS 动画不会被打断。
+const SCENE = {
+  GROUND: 290,
+  slots: [258, 470, 770, 975],
+  posts: { oxygen: 196, farm: 442, water: 662, power: 886, mine: 1140 },
+  built: false,
+};
 
 function lastBubble() {
   for (let i = G.log.length - 1; i >= 0; i--) {
@@ -653,119 +662,211 @@ function lastBubble() {
   return null;
 }
 
-function renderScene() {
+function buildScene() {
+  const svg = document.getElementById("sceneSvg");
+  const G0 = SCENE.GROUND;
+
+  const lamps = [320, 700, 1080].map(function (lx) {
+    return '<path d="M' + lx + ' 16 V40" stroke="#1a212a" stroke-width="2"/>' +
+      '<rect x="' + (lx - 15) + '" y="40" width="30" height="7" rx="3" fill="#2b3542"/>' +
+      '<circle cx="' + lx + '" cy="48" r="3" fill="#d29922" opacity=".8"/>' +
+      '<path class="lamp" d="M' + (lx - 14) + ' 52 L' + (lx + 14) + ' 52 L' + (lx + 50) + ' 108 L' + (lx - 50) + ' 108 Z" fill="#d29922"/>';
+  }).join("");
+
+  const crops = [0, 1, 2, 3, 4].map(function (i) {
+    const x = 308 + i * 32;
+    return '<path d="M' + x + ' 286 q -11 -22 0 -38"/><path d="M' + x + ' 278 q 12 -15 19 -20"/>';
+  }).join("");
+
+  const people = SCENE.slots.map(function (_, i) {
+    return '<g id="who' + i + '" class="who">' +
+      '<g class="bob">' +
+        '<path class="lg" d="M-8 -14 V0 M8 -14 V0" stroke-width="5" stroke-linecap="round"/>' +
+        '<rect class="bd" x="-15" y="-56" width="30" height="44" rx="10"/>' +
+        '<circle class="hd" cx="0" cy="-70" r="13"/>' +
+        '<circle cx="-4.5" cy="-72" r="2" fill="#0a0e13"/>' +
+        '<circle cx="4.5" cy="-72" r="2" fill="#0a0e13"/>' +
+      '</g>' +
+      '<g id="bed' + i + '" style="display:none" opacity=".3">' +
+        '<rect x="-30" y="-12" width="60" height="9" rx="3" fill="#252d38"/>' +
+        '<rect x="-30" y="-26" width="16" height="13" rx="3" fill="#2b3542"/>' +
+        '<rect x="8" y="-16" width="22" height="4" rx="2" fill="#1d2530"/>' +
+      '</g>' +
+      '<text id="nm' + i + '" y="20" text-anchor="middle" font-size="11"></text>' +
+      '</g>';
+  }).join("");
+
+  svg.innerHTML =
+    '<style>' +
+      '.fan{transform-box:fill-box;transform-origin:center;animation:spin 3s linear infinite}' +
+      '.fan.slow{animation-duration:9s}' +
+      '.fan.stop{animation:none}' +
+      '@keyframes spin{to{transform:rotate(360deg)}}' +
+      '.lamp{animation:lamp 5s ease-in-out infinite}' +
+      '@keyframes lamp{0%,100%{opacity:.03}50%{opacity:.1}}' +
+      '.who{transition:transform .65s cubic-bezier(.4,0,.3,1)}' +
+      '.nofx .who{transition:none}' +
+      '.bob{animation:bob 3.8s ease-in-out infinite}' +
+      '@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}' +
+      '.wl{transition:y .8s ease,height .8s ease,d .8s ease}' +
+      '.bp{animation:pop .22s ease-out both}' +
+      '@keyframes pop{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}' +
+    '</style>' +
+
+    '<rect width="1264" height="320" fill="#070a0e"/>' +
+    '<path d="M0 16 H1264" stroke="#151b23" stroke-width="2"/>' +
+    '<path d="M0 21 H1264" stroke="#10161d" stroke-width="1"/>' +
+    lamps +
+    '<rect y="' + (G0 + 2) + '" width="1264" height="30" fill="#0c1116"/>' +
+    '<path d="M0 ' + G0 + ' H1264" stroke="#242c36" stroke-width="2"/>' +
+    '<ellipse cx="120" cy="306" rx="10" ry="3" fill="#141a22"/>' +
+    '<ellipse cx="360" cy="312" rx="10" ry="3" fill="#141a22"/>' +
+    '<ellipse cx="600" cy="304" rx="10" ry="3" fill="#141a22"/>' +
+    '<ellipse cx="850" cy="314" rx="10" ry="3" fill="#141a22"/>' +
+    '<ellipse cx="1100" cy="307" rx="10" ry="3" fill="#141a22"/>' +
+
+    // 制氧机
+    '<rect x="40" y="110" width="170" height="180" rx="10" fill="#121820" stroke="#252d38"/>' +
+    '<rect x="58" y="126" width="134" height="7" rx="3" fill="#1d2530"/>' +
+    '<circle id="oRing" cx="105" cy="198" r="34" fill="#0a0e13" stroke-width="3"/>' +
+    '<g id="oFan" class="fan" stroke-width="4" stroke-linecap="round">' +
+      '<path d="M105 176 V220"/><path d="M84 186 L126 210"/><path d="M126 186 L84 210"/></g>' +
+    '<path d="M162 110 V70 H200" stroke="#2b3542" stroke-width="7" fill="none"/>' +
+
+    // 农田
+    '<rect x="290" y="240" width="160" height="50" rx="6" fill="#171310"/>' +
+    '<g id="crop" stroke-width="3.5" fill="none">' + crops + '</g>' +
+
+    // 水箱
+    '<rect x="500" y="110" width="170" height="180" rx="10" fill="#0a0e13" stroke="#252d38"/>' +
+    '<rect id="wBody" class="wl" x="507" y="285" width="156" height="0" rx="5" fill="#1f6feb" opacity=".45"/>' +
+    '<path id="wWave" class="wl" d="" stroke="#58a6ff" stroke-width="2" fill="none" opacity=".75"/>' +
+
+    // 发电机
+    '<rect x="720" y="130" width="170" height="160" rx="10" fill="#121820" stroke="#252d38"/>' +
+    '<circle id="pRing" cx="782" cy="210" r="30" fill="#0a0e13" stroke-width="3"/>' +
+    '<g id="pFan" class="fan" stroke-width="4" stroke-linecap="round">' +
+      '<path d="M782 190 V230"/><path d="M762 210 H802"/>' +
+      '<path d="M768 196 L796 224"/><path d="M796 196 L768 224"/></g>' +
+    '<path d="M840 160 V120 h18" stroke="#2b3542" stroke-width="6" fill="none"/>' +
+
+    // 矿道
+    '<path d="M950 290 A 90 90 0 0 1 1130 290 Z" fill="#030507"/>' +
+    '<path d="M950 290 A 90 90 0 0 1 1130 290" stroke="#2b3542" stroke-width="3" fill="none"/>' +
+    '<path id="crack" d="M980 232 L1010 254 L1000 278" stroke="#f85149" stroke-width="2.5" fill="none" opacity=".7" style="display:none"/>' +
+    '<text x="1040" y="310" text-anchor="middle" fill="#4b5563" font-size="12">矿道</text>' +
+
+    people +
+
+    '<g id="bub" class="bp" style="display:none">' +
+      '<rect id="bubR" height="28" rx="14" fill="#e6edf3" opacity=".95"/>' +
+      '<path id="bubT" fill="#e6edf3" opacity=".95"/>' +
+      '<text id="bubX" text-anchor="middle" fill="#0d1117" font-size="12"></text>' +
+    '</g>';
+}
+
+function updateScene() {
   const svg = document.getElementById("sceneSvg");
   if (!svg) return;
+  const G0 = SCENE.GROUND;
   const s = G.res;
   const lv = v => v <= 15 ? "#f85149" : v <= 35 ? "#d29922" : "#3fb950";
-  const G0 = SCENE.GROUND;
-  const p = [];
-
-  // 岩层、顶灯、地面
-  p.push('<rect width="1264" height="320" fill="#070a0e"/>');
-  p.push('<path d="M0 16 H1264" stroke="#151b23" stroke-width="2"/>');
-  p.push('<path d="M0 21 H1264" stroke="#10161d" stroke-width="1"/>');
-  [320, 700, 1080].forEach(function (lx) {
-    p.push('<path d="M' + lx + ' 16 V40" stroke="#1a212a" stroke-width="2"/>');
-    p.push('<rect x="' + (lx - 15) + '" y="40" width="30" height="7" rx="3" fill="#2b3542"/>');
-    p.push('<circle cx="' + lx + '" cy="50" r="3" fill="#d29922" opacity=".75"/>');
-    p.push('<path d="M' + (lx - 14) + ' 52 L' + (lx + 14) + ' 52 L' + (lx + 46) + ' 96 L' + (lx - 46) + ' 96 Z" fill="#d29922" opacity=".04"/>');
-  });
-  p.push('<rect y="' + (G0 + 2) + '" width="1264" height="30" fill="#0c1116"/>');
-  p.push('<path d="M0 ' + G0 + ' H1264" stroke="#242c36" stroke-width="2"/>');
-  [[120, 306], [360, 312], [600, 304], [850, 314], [1100, 307], [1210, 312]].forEach(function (q) {
-    p.push('<ellipse cx="' + q[0] + '" cy="' + q[1] + '" rx="10" ry="3" fill="#141a22"/>');
-  });
+  const $ = id => document.getElementById(id);
+  const posts = G.posts || [];
 
   // 制氧机
   const oxyC = lv(s.oxygen);
-  p.push('<rect x="40" y="110" width="170" height="180" rx="10" fill="#121820" stroke="#252d38"/>');
-  p.push('<rect x="58" y="126" width="134" height="7" rx="3" fill="#1d2530"/>');
-  p.push('<circle cx="105" cy="198" r="34" fill="#0a0e13" stroke="' + oxyC + '" stroke-width="3"/>');
-  p.push('<g stroke="' + oxyC + '" stroke-width="4" stroke-linecap="round" opacity=".9">');
-  p.push('<path d="M105 176 V220"/><path d="M84 186 L126 210"/><path d="M126 186 L84 210"/></g>');
-  p.push('<path d="M162 110 V70 H200" stroke="#2b3542" stroke-width="7" fill="none"/>');
+  $("oRing").setAttribute("stroke", oxyC);
+  $("oFan").setAttribute("stroke", oxyC);
+  $("oFan").setAttribute("class", "fan" + (s.oxygen <= 15 ? " stop" : s.oxygen <= 35 ? " slow" : ""));
 
   // 农田
-  const foodC = lv(s.food);
-  p.push('<rect x="290" y="240" width="160" height="50" rx="6" fill="#171310"/>');
-  for (let i = 0; i < 5; i++) {
-    const x = 308 + i * 32;
-    p.push('<path d="M' + x + ' 286 q -11 -22 0 -38" stroke="' + foodC + '" stroke-width="3.5" fill="none"/>');
-    p.push('<path d="M' + x + ' 278 q 12 -15 19 -20" stroke="' + foodC + '" stroke-width="3.5" fill="none"/>');
-  }
+  $("crop").setAttribute("stroke", lv(s.food));
 
   // 水箱
   const wH = Math.max(0, Math.min(174, Math.round(174 * Math.min(100, s.water) / 100)));
-  p.push('<rect x="500" y="110" width="170" height="180" rx="10" fill="#0a0e13" stroke="#252d38"/>');
-  if (wH > 0) {
-    p.push('<rect x="507" y="' + (285 - wH) + '" width="156" height="' + wH + '" rx="5" fill="#1f6feb" opacity=".45"/>');
-    p.push('<path d="M507 ' + (285 - wH) + ' q 39 -6 78 0 t 78 0" stroke="#58a6ff" stroke-width="2" fill="none" opacity=".75"/>');
-  }
+  const wy = 285 - wH;
+  $("wBody").setAttribute("y", wy);
+  $("wBody").setAttribute("height", wH);
+  $("wWave").setAttribute("d", wH > 3 ? "M507 " + wy + " q 39 -6 78 0 t 78 0" : "");
 
   // 发电机
   const powC = lv(s.power);
-  p.push('<rect x="720" y="130" width="170" height="160" rx="10" fill="#121820" stroke="#252d38"/>');
-  p.push('<circle cx="782" cy="210" r="30" fill="#0a0e13" stroke="' + powC + '" stroke-width="3"/>');
-  p.push('<g stroke="' + powC + '" stroke-width="4" stroke-linecap="round">');
-  p.push('<path d="M782 190 V230"/><path d="M762 210 H802"/><path d="M768 196 L796 224"/><path d="M796 196 L768 224"/></g>');
-  p.push('<path d="M840 160 V120 h18" stroke="#2b3542" stroke-width="6" fill="none"/>');
+  $("pRing").setAttribute("stroke", powC);
+  $("pFan").setAttribute("stroke", powC);
+  $("pFan").setAttribute("class", "fan" + (s.power <= 15 ? " stop" : s.power <= 35 ? " slow" : ""));
 
   // 矿道
-  p.push('<path d="M950 290 A 90 90 0 0 1 1130 290 Z" fill="#030507"/>');
-  p.push('<path d="M950 290 A 90 90 0 0 1 1130 290" stroke="#2b3542" stroke-width="3" fill="none"/>');
-  if (s.material <= 15) {
-    p.push('<path d="M980 232 L1010 254 L1000 278" stroke="#f85149" stroke-width="2.5" fill="none" opacity=".7"/>');
-  }
-  p.push('<text x="1040" y="310" text-anchor="middle" fill="#4b5563" font-size="12">矿道</text>');
+  $("crack").style.display = s.material <= 15 ? "" : "none";
 
   // 人
-  SCENE.xs.forEach(function (x, i) {
-    const who = G.survivors[i];
-    if (!who) return;
+  G.survivors.forEach(function (who, i) {
+    const g = $("who" + i);
+    if (!g) return;
+    const post = posts[i] && SCENE.posts[posts[i]];
+    const x = post || SCENE.slots[i];
+    const nm = $("nm" + i);
+    const bob = g.querySelector(".bob");
+    const bed = $("bed" + i);
+
     if (!who.alive) {
-      p.push('<g opacity=".3">');
-      p.push('<rect x="' + (x - 30) + '" y="' + (G0 - 12) + '" width="60" height="9" rx="3" fill="#252d38"/>');
-      p.push('<rect x="' + (x - 30) + '" y="' + (G0 - 26) + '" width="16" height="13" rx="3" fill="#2b3542"/>');
-      p.push('<rect x="' + (x + 8) + '" y="' + (G0 - 16) + '" width="22" height="4" rx="2" fill="#1d2530"/>');
-      p.push('</g>');
-      p.push('<text x="' + x + '" y="' + (G0 + 20) + '" text-anchor="middle" fill="#4b5563" font-size="11">' +
-        (who.left ? "走了" : "空床") + '</text>');
+      bob.style.display = "none";
+      bed.style.display = "";
+      nm.textContent = who.left ? "走了" : "空床";
+      nm.setAttribute("fill", "#4b5563");
+      g.style.transform = "translate(" + x + "px," + G0 + "px)";
       return;
     }
+    bob.style.display = "";
+    bed.style.display = "none";
+    nm.textContent = who.name;
+    nm.setAttribute("fill", "#6e7681");
+
     const st = who.stress;
     const lean = st >= 60 ? 9 : st >= 30 ? 4 : 0;
     const col = st >= 80 ? "#f85149" : st >= 60 ? "#d29922" : "#9aa4b1";
-    p.push('<g transform="translate(' + x + ',' + G0 + ') rotate(' + lean + ')">');
-    p.push('<path d="M-8 -14 V0 M8 -14 V0" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/>');
-    p.push('<rect x="-15" y="-56" width="30" height="44" rx="10" fill="' + col + '"/>');
-    p.push('<circle cx="0" cy="-70" r="13" fill="' + col + '"/>');
-    p.push('<circle cx="-4.5" cy="-72" r="2" fill="#0a0e13"/><circle cx="4.5" cy="-72" r="2" fill="#0a0e13"/>');
-    p.push('</g>');
-    p.push('<text x="' + x + '" y="' + (G0 + 20) + '" text-anchor="middle" fill="#6e7681" font-size="11">' +
-      escapeHtml(who.name) + '</text>');
+    g.querySelectorAll(".lg").forEach(e => e.setAttribute("stroke", col));
+    g.querySelector(".bd").setAttribute("fill", col);
+    g.querySelector(".hd").setAttribute("fill", col);
+    g.style.transform = "translate(" + x + "px," + G0 + "px) rotate(" + lean + "deg)";
   });
 
   // 气泡
+  const bub = $("bub");
   const b = lastBubble();
-  if (b) {
-    const idx = G.survivors.findIndex(function (q) { return q.name === b.who; });
-    if (idx >= 0 && G.survivors[idx].alive) {
-      const x = SCENE.xs[idx];
-      let say = b.say;
-      if (say.length > 20) say = say.slice(0, 20) + "…";
-      const bw = Math.max(84, say.length * 13 + 24);
-      const bx = Math.max(10, Math.min(1264 - bw - 10, x - bw / 2));
-      const by = 158;
-      p.push('<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="28" rx="14" fill="#e6edf3" opacity=".95"/>');
-      p.push('<path d="M' + (x - 6) + ' ' + (by + 27) + ' L' + x + ' ' + (by + 40) + ' L' + (x + 6) + ' ' + (by + 27) +
-        '" fill="#e6edf3" opacity=".95"/>');
-      p.push('<text x="' + (bx + bw / 2) + '" y="' + (by + 19) + '" text-anchor="middle" fill="#0d1117" font-size="12">' +
-        escapeHtml(say) + '</text>');
-    }
-  }
+  const idx = b ? G.survivors.findIndex(q => q.name === b.who) : -1;
+  if (idx < 0 || !G.survivors[idx].alive) { bub.style.display = "none"; return; }
+  let say = b.say;
+  if (say.length > 20) say = say.slice(0, 20) + "…";
+  const post = posts[idx] && SCENE.posts[posts[idx]];
+  const x = post || SCENE.slots[idx];
+  const bw = Math.max(84, say.length * 13 + 24);
+  const bx = Math.max(10, Math.min(1264 - bw - 10, x - bw / 2));
+  const by = 158;
+  $("bubR").setAttribute("x", bx);
+  $("bubR").setAttribute("y", by);
+  $("bubR").setAttribute("width", bw);
+  $("bubT").setAttribute("d",
+    "M" + (x - 6) + " " + (by + 27) + " L" + x + " " + (by + 40) + " L" + (x + 6) + " " + (by + 27) + " Z");
+  $("bubX").setAttribute("x", bx + bw / 2);
+  $("bubX").setAttribute("y", by + 19);
+  $("bubX").textContent = say;
+  bub.style.display = "";
+}
 
-  svg.innerHTML = p.join("");
+function renderScene() {
+  if (!SCENE.built) {
+    buildScene();
+    SCENE.built = true;
+    const svg = document.getElementById("sceneSvg");
+    svg.classList.add("nofx");
+    updateScene();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { svg.classList.remove("nofx"); });
+    });
+    return;
+  }
+  updateScene();
 }
 
 // ---------- 渲染 ----------
@@ -879,12 +980,26 @@ function doAction(id) {
   G.points -= 1;
   clampAll();
   log(text, a.id === "study" ? "sys" : "");
+  sendToWork(id);
   render();
+}
+
+// 画面上的走位：派一个闲着的人去这个工位。只影响画，不影响数值。
+const WORK_POST = { oxy: "oxygen", farm: "farm", water: "water", power: "power", mine: "mine" };
+function sendToWork(id) {
+  const post = WORK_POST[id];
+  if (!post) return;
+  if (!G.posts) G.posts = [null, null, null, null];
+  for (let i = 0; i < G.survivors.length; i++) {
+    const p = G.survivors[i];
+    if (p.alive && !G.posts[i]) { G.posts[i] = post; return; }
+  }
 }
 
 // ---------- 一天结束 ----------
 function nextDay() {
   if (G.over || G.paused) return;
+  G.posts = [null, null, null, null];
 
   if (!G.awakened && G.theoryTotal >= BAL.revealAt) awaken();
 
