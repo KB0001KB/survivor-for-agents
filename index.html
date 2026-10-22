@@ -18,6 +18,18 @@
     user-select:none; overflow:hidden;
   }
 
+  #grid{
+    position:fixed; inset:0; pointer-events:none; z-index:999;
+    background-image:
+      linear-gradient(to right, rgba(120,170,255,.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(120,170,255,.07) 1px, transparent 1px);
+    background-size:100px 100px;
+  }
+  #grid::after{
+    content:"100px"; position:absolute; left:4px; bottom:2px;
+    font-size:9px; color:rgba(120,170,255,.35);
+  }
+
   #bar{
     height:44px; display:flex; align-items:center; gap:18px;
     padding:0 12px; background:var(--panel);
@@ -141,6 +153,8 @@
 </style>
 </head>
 <body>
+
+<div id="grid"></div>
 
 <div id="bar">
   <div class="res"><span class="k">氧气</span><span class="v" id="r-oxygen">100</span></div>
