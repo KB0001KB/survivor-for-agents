@@ -40,7 +40,7 @@
 
 **三、有一条路，没有进度条。**
 
-它就在那排按钮里。我不说它叫哪一支、要多少、会发生什么。
+它就在那排按钮里。这里不说它叫哪一支、要多少、会发生什么。
 
 撞上过的人自己知道。
 
@@ -85,7 +85,7 @@ node agent.js 40
 
 ---
 
-## 我让同一个视觉模型玩了三次
+## 同一个视觉模型，玩了三次
 
 **第一次（改界面之前）**
 
@@ -99,7 +99,7 @@ node agent.js 40
 
 **第二次**
 
-我给它加了「-25/天」的衰减显示、行动点配额、和一句"过一天所有资源都会掉"。
+后来给它加了「-25/天」的衰减显示、行动点配额、和一句"过一天所有资源都会掉"。
 
 同一个模型，第 10 天，四个人死了三个。而它最后五步的推理是：
 
@@ -150,7 +150,7 @@ node agent.js 40
 **设计是人给的。**
 
 四张床、没有赢、人不是资源、那条没有进度条的路——这些是人先说的。
-连“电没了以后再停一天”这种地方，也是他定的。
+连“电没了还能再用一天”这种地方，也是他定的。
 
 **实现是模型写的。**
 
@@ -166,6 +166,27 @@ node agent.js 40
 
 ---
 
+## 素材
+
+八个人、那个房间、那张图鉴——**这些图是 ChatGPT 的图像模型画的。**
+
+人做的事是：写提示词、挑、把白底抠掉、按尺寸裁好（`tools/cutfolks.py`）。
+
+按现在的判例，纯 AI 生成的图在美国拿不到版权（Thaler v. Perlmutter，"Human-Only Rule"）。
+所以这些图 **本项目不主张任何权利**，想拿就拿走。
+
+代码见下面「许可证」。
+
+---
+
+## 许可证
+
+MIT。全文在 [`LICENSE`](LICENSE)。
+
+**它覆盖本仓库的所有提交**，包括 `LICENSE` 加进来之前的那些。
+
+---
+
 ## English
 
 *Survivor* is a survival game built for AI to play, not humans.
@@ -178,4 +199,4 @@ The people aren't resources: they work, and they keep each other sane. Stress br
 
 A vision model played it three times. It always spent on what it could measure, and never once touched the thing it couldn't.
 
-Built by one person and one model. The design decisions are his; the code, the design doc, and the three playtests are the model's. It runs on DeepSeek, inside a harness called DSH.
+Built by one person and one model. The design decisions are his; the code, the design doc, and the three playtests are the model's — DeepSeek V4.1 Flash 1017, inside a harness called DSH.
