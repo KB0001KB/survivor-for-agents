@@ -666,6 +666,9 @@ function fresh() {
                : n >= 8  ? "有几页开始写同样的话了。"
                : "有些页还是空白。";
     log("（这本书上记着 " + n + " 条没写完的笔记。" + tail + "）", "sys");
+    if (n >= 6) {
+      log("（最后一页背面有铅笔字，不是这一局的笔迹：「要是写够长，是不是就不用天天算还剩几天。」）", "sys");
+    }
   }
 }
 
@@ -1603,15 +1606,22 @@ function awaken() {
 
 function end(title, text) {
   G.over = true;
-  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title, notes: G.theory || 0 });
+  const wrote = G.theory || 0;
+  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title, notes: wrote });
+
+  // 好好收尾的人，才在书上留得下一笔。全员惨死的局，什么也带不走。
+  const gift = title !== "全灭了" && !G.awakened;
+  if (gift) { G.theory += 1; G.theoryTotal += 1; }
+
   saveGame();
   document.getElementById("over-title").textContent = title;
   document.getElementById("over-text").textContent = text;
-  // 死了六次，总得知道每次没白死。这一行是那条路存在的唯一凭证。
-  const n = G.theory || 0;
-  document.getElementById("over-note").textContent = n > 0
-    ? ("这一局你写下了 " + n + " 条笔记。这本书现在有 " + G.theoryTotal + " 条。")
+
+  let note = wrote > 0
+    ? ("这一局你写下了 " + wrote + " 条笔记。这本书现在有 " + G.theoryTotal + " 条。")
     : "这一局没有留下笔记。";
+  if (gift) note += "　临走前又有人添了一笔。";
+  document.getElementById("over-note").textContent = note;
   document.getElementById("over").classList.add("show");
   render();
 }
