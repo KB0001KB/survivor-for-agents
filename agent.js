@@ -38,13 +38,24 @@ function loadCfg() {
   return JSON.parse(fs.readFileSync(CFG_PATH, "utf8"));
 }
 
-async function askVision(cfg, b64, history) {
+async function askVision(cfg, b64, history, noChange, stuck) {
   const messages = [{ role: "system", content: SYS }];
   for (const h of history) messages.push(h);
+
+  let note = "这是当前画面。下一步做什么？只回 JSON。";
+  if (noChange) {
+    note = "【重要】你上一步点下去之后，画面完全没有变化——说明点空了。\n" +
+      "不要再用同样的坐标。看图重新估一个更靠按钮中间的位置。\n\n" + note;
+  }
+  if (stuck >= 3) {
+    note = "【你已经连续 " + stuck + " 次没有造成任何变化】\n" +
+      "换一个完全不同的位置，或者换一个动作，别再重复。\n\n" + note;
+  }
+
   messages.push({
     role: "user",
     content: [
-      { type: "text", text: "这是当前画面。下一步做什么？只回 JSON。" },
+      { type: "text", text: note },
       { type: "image_url", image_url: { url: "data:image/png;base64," + b64 } },
     ],
   });
@@ -93,13 +104,22 @@ async function main() {
 
   say("=== 开始，模型 " + cfg.model + " ===");
 
+  const crypto = require("crypto");
+  let prevHash = "";
+  let stuck = 0;
+
   for (let i = 1; i <= steps; i++) {
     const b64 = await page.screenshot({ encoding: "base64" });
     fs.writeFileSync(path.join(__dirname, "shots", "agent-" + String(i).padStart(3, "0") + ".png"), b64, "base64");
 
+    const hash = crypto.createHash("md5").update(b64).digest("hex");
+    const noChange = prevHash !== "" && hash === prevHash;
+    if (noChange) stuck += 1; else stuck = 0;
+    prevHash = hash;
+
     let text = "";
     try {
-      text = await askVision(cfg, b64, history);
+      text = await askVision(cfg, b64, history, noChange, stuck);
     } catch (e) {
       say("[" + i + "] 请求失败：" + e.message);
       await new Promise((r) => setTimeout(r, 3000));
