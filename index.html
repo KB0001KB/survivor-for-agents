@@ -212,6 +212,31 @@
     background:#21262d; border:1px solid var(--accent); color:var(--accent);
     border-radius:6px; padding:8px 20px; cursor:pointer; font-family:inherit;
   }
+
+  #awake{
+    position:fixed; inset:0; background:rgba(0,0,0,.88);
+    display:none; align-items:flex-start; justify-content:center;
+    padding-top:56px; z-index:40;
+  }
+  #awake.show{display:flex;}
+  #awake .box{
+    background:var(--panel); border:1px solid var(--accent); border-radius:10px;
+    padding:22px 30px; width:min(720px,90vw); max-height:460px;
+    display:flex; flex-direction:column;
+  }
+  #awake h2{font-size:19px; margin-bottom:6px; color:var(--accent);}
+  #awake .sub{color:var(--dim); font-size:12px; margin-bottom:12px; line-height:1.7;}
+  #awakeList{ overflow:auto; min-height:0; }
+  #awake .r{padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; line-height:1.7;}
+  #awake .r:last-child{border-bottom:none;}
+  #awake .r .w{color:var(--bad);}
+  #awake .r .ok{color:var(--ok);}
+  #awake button{
+    flex:none; align-self:flex-start;
+    background:#21262d; border:1px solid var(--accent); color:var(--accent);
+    border-radius:6px; padding:8px 22px; cursor:pointer; font-family:inherit;
+    margin-top:14px;
+  }
 </style>
 </head>
 <body>
@@ -276,6 +301,13 @@
   <h2 id="over-title"></h2>
   <p id="over-text"></p>
   <button onclick="location.reload()">再来一局</button>
+</div></div>
+
+<div id="awake"><div class="box">
+  <h2>他们等到了。</h2>
+  <p class="sub">外面还是黑的。从今天起，这屋子自己会活。</p>
+  <div id="awakeList"></div>
+  <button id="awakeOk">合上这本子</button>
 </div></div>
 
 <script>
@@ -540,7 +572,11 @@ function checkEnd() {
 const SAVE_KEY = "survival.save.v1";
 
 function loadSave() {
-  try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "{}"); }
+  try {
+    // 从编辑器里存回来的 JSON 可能带 BOM，别让它把整局记忆清空
+    const raw = (localStorage.getItem(SAVE_KEY) || "{}").replace(/^\uFEFF/, "");
+    return JSON.parse(raw);
+  }
   catch (e) { return {}; }
 }
 
@@ -632,7 +668,7 @@ function loadRun() {
   try {
     const raw = localStorage.getItem(RUN_KEY);
     if (!raw) return false;
-    const d = JSON.parse(raw);
+    const d = JSON.parse(raw.replace(/^\uFEFF/, ""));
     if (d.v !== 1 || d.over) return false;
     if (!Array.isArray(d.sur) || d.sur.length !== 4) return false;
     G.day = d.day;
@@ -1498,13 +1534,23 @@ function awaken() {
   log("那天早上，制氧机的读数自己稳住了。没人去修，它就是稳住了。", "sys");
   log("水不掉了，粮食在往外堆。外面还是黑的，但屋里开始像能住的地方。", "sys");
   log("到这一步，才有人明白那些笔记到底在写什么。", "sys");
+
+  // 日志只有两行高，念不完。所以单独开一张纸，把名字一条条摆出来。
+  const list = document.getElementById("awakeList");
   if (G.runs.length) {
+    list.innerHTML = G.runs.map(function (r, i) {
+      return '<div class="r"><b>第 ' + (i + 1) + ' 局</b>，第 ' + r.day + ' 天，<span class="w">' +
+        escapeHtml(r.why) + '</span>，走了 ' + r.dead + ' 个人。<span class="ok">—— 他们等到了。</span></div>';
+    }).join("");
     G.runs.forEach(function (r, i) {
       log("第 " + (i + 1) + " 局，第 " + r.day + " 天，" + r.why + "，走了 " + r.dead + " 个人。—— 他们等到了。", "ok");
     });
   } else {
+    list.innerHTML = '<div class="r">这一次是第一次。没有人等过。</div>';
     log("这一次是第一次。没有人等过。", "ok");
   }
+  const box = document.getElementById("awake");
+  if (box) box.classList.add("show");
 }
 
 function end(title, text) {
@@ -1518,6 +1564,10 @@ function end(title, text) {
 }
 
 // ---------- 暂停 ----------
+document.getElementById("awakeOk").addEventListener("click", () => {
+  document.getElementById("awake").classList.remove("show");
+});
+
 document.getElementById("pause").addEventListener("click", () => {
   G.paused = !G.paused;
   render();
