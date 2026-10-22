@@ -304,9 +304,31 @@ const NAMES = [
     wishLine: "我想吃一碗有肉的面。不用多，就一碗。你们随便笑话我。",
     lines: ["我梦见面条了。", "这个能吃吗？我就是问问。", "饿的时候我什么都想得出来。", "你把最后那口省给了别人，我看见了。"],
   },
+  {
+    name: "老周", trait: "沉默", wishId: "radio",
+    wish: "想听一次收音机里的老歌",
+    wishLine: "我想听一次收音机。随便什么歌都行，只要是人在唱。",
+    lines: ["……", "嗯。", "我以前话比现在多。", "你们说，我听着。"],
+  },
+  {
+    name: "阿丁", trait: "急性子", wishId: "run",
+    wish: "想跑一次，真的跑起来",
+    wishLine: "我想跑一次。就在这条走廊里，跑到底再跑回来，跑到喘不上气。",
+    lines: ["这地方连走路都嫌窄。", "快点，行不行。", "我腿都僵了。", "你别慢吞吞的。"],
+  },
+  {
+    name: "阿雀", trait: "话多", wishId: "tell",
+    wish: "想有人把一件事听完",
+    wishLine: "我有一件事，从头到尾没跟人说完过。你能不能就听我说完，别打断。",
+    lines: ["我跟你说个事儿。", "你别嫌我烦。", "上次说到哪儿了？", "你听我说话了吗。"],
+  },
+  {
+    name: "老韩", trait: "记性好", wishId: "record",
+    wish: "想把这些日子记下来",
+    wishLine: "我想把这段日子写下来。谁死了，谁说了什么。省得以后没人知道。",
+    lines: ["我记着呢。", "第七天，水少了一桶。", "你上次说那句话，我记下来了。", "人总得留点什么。"],
+  },
 ];
-
-// ---------- 圆梦 ----------
 const WISH_COST = {
   sleep: {
     label: "让他睡一整天", need: "1 个行动点",
@@ -336,6 +358,34 @@ const WISH_COST = {
     done: "面煮得很烂，肉只有两片。他吃得很慢，一口一口，最后连汤都喝了。",
     leave: "他说吃饱了。然后说，想去别处再吃一碗。",
   },
+  radio: {
+    label: "修好收音机", need: "电 40",
+    can: (s) => s.power >= 40,
+    apply: (s) => { s.power -= 40; },
+    done: "收音机响了很久的杂音，最后出来一首歌。他没听完就笑了。",
+    leave: "第二天他把收音机带走了，说要去找个能收到台的地方。",
+  },
+  run: {
+    label: "把走廊清出来", need: "1 个行动点 / 材料 20",
+    can: (s, g) => g.points > 0 && s.material >= 20,
+    apply: (s, g) => { g.points -= 1; s.material -= 20; },
+    done: "他从这头跑到那头，又跑回来，跑了七趟，最后扶着膝盖喘。",
+    leave: "他说腿终于不僵了。然后说要上去，真的跑一次。",
+  },
+  tell: {
+    label: "听他说完", need: "1 个行动点",
+    can: (s, g) => g.points > 0,
+    apply: (s, g) => { g.points -= 1; },
+    done: "他说了很久，中间停了三次。没人打断。说完他说了声谢谢。",
+    leave: "他说这件事说完了，心里空出来一块，想出去走走。",
+  },
+  record: {
+    label: "给他纸和笔", need: "材料 30",
+    can: (s) => s.material >= 30,
+    apply: (s) => { s.material -= 30; },
+    done: "他写了很多页。最后一页写着：这里曾经有四个人。",
+    leave: "他把本子留下，说想再去找点能写的东西。",
+  },
 };
 
 const WISH_MUTTER = {
@@ -343,6 +393,10 @@ const WISH_MUTTER = {
   bath: ["水凉了。", "算了。", "我不说了。", "……"],
   signal: ["刚刚……好像有声音。", "没事，我听错了。", "你有没有觉得太安静了。"],
   noodle: ["我不饿。", "那个……算了。", "梦里吃到了一半。"],
+  radio: ["……", "没信号。", "算了。", "以前有首歌，我忘了怎么唱。"],
+  run: ["我腿麻了。", "走两步就喘。", "算了。"],
+  tell: ["我刚才想说什么来着。", "没事。", "你忙吧。"],
+  record: ["今天几号了？", "我忘了上一句是什么。", "算了，不写了。"],
 };
 
 const CRASH = {
@@ -361,6 +415,22 @@ const CRASH = {
   "阿豆": {
     act: "暴食", text: "把存着的那点口粮吃掉一大半。",
     apply: (s) => { s.food = Math.max(0, s.food - 25); },
+  },
+  "老周": {
+    act: "一个字都不说", text: "从早到晚没开口。别人问他，他就点点头。",
+    apply: (s, g) => { g.survivors.forEach(q => { if (q.alive) q.bond = Math.max(0, q.bond - 2); }); },
+  },
+  "阿丁": {
+    act: "砸墙", text: "一拳一拳砸在墙上，砸到手上的皮破了。",
+    apply: (s) => { s.material = Math.max(0, s.material - 20); s.oxygen = Math.max(0, s.oxygen - 5); },
+  },
+  "阿雀": {
+    act: "哭个不停", text: "坐在角落里哭，谁劝都不停。屋里全是她的声音。",
+    apply: (s, g) => { g.survivors.forEach(q => { if (q.alive) q.stress += 6; }); },
+  },
+  "老韩": {
+    act: "写个不停", text: "写了一整夜，写到天亮，什么活都没干。",
+    apply: (s, g) => { g.points = Math.max(0, g.points - 1); },
   },
 };
 
@@ -451,7 +521,9 @@ function fresh() {
   G.lastOneLogged = false;
   G.rollCallPending = false;
   G.awakened = false;
-  G.survivors = NAMES.map(n => ({
+  // 每次从池子里抽四个，不是固定的那几位
+  const picked = NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+  G.survivors = picked.map(n => ({
     name: n.name, trait: n.trait, stress: 0, alive: true,
     bond: 50, wishId: n.wishId, wish: n.wish, wishLine: n.wishLine, lines: n.lines,
     wishKnown: false, talked: false, left: false,
