@@ -96,6 +96,7 @@
   #log .t{color:var(--dim); margin-right:8px;}
   #log .bad{color:var(--bad);} #log .ok{color:var(--ok);} #log .warn{color:var(--warn);}
   #log .sys{color:var(--accent);}
+  #log .dim{color:#6e7681;}
 
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
@@ -273,6 +274,13 @@ const WISH_COST = {
     done: "面煮得很烂，肉只有两片。他吃得很慢，一口一口，最后连汤都喝了。",
     leave: "他说吃饱了。然后说，想去别处再吃一碗。",
   },
+};
+
+const WISH_MUTTER = {
+  sleep: ["……", "今天也就这样吧。", "我没事。", "你忙你的。"],
+  bath: ["水凉了。", "算了。", "我不说了。", "……"],
+  signal: ["刚刚……好像有声音。", "没事，我听错了。", "你有没有觉得太安静了。"],
+  noodle: ["我不饿。", "那个……算了。", "梦里吃到了一半。"],
 };
 
 function grantWish(i) {
@@ -553,6 +561,14 @@ function nextDay() {
   G.day += 1;
   G.points = BAL.pointsPerDay;
   G.survivors.forEach(p => { p.talked = false; });
+
+  // 愿望说了却一直没圆的人，会嘟囔一句
+  const murmur = G.survivors.filter(p => p.alive && p.wishKnown && !p.left);
+  if (murmur.length) {
+    const mp = murmur[Math.floor(Math.random() * murmur.length)];
+    const pool = WISH_MUTTER[mp.wishId] || ["……"];
+    log(mp.name + "：" + pool[Math.floor(Math.random() * pool.length)], "dim");
+  }
 
   // 崩溃：崩掉的人第二天什么也干不了
   G.survivors.forEach(p => {
