@@ -645,7 +645,7 @@ function escapeHtml(s) {
 // ---------- 场景（只给人看，不参与判定） ----------
 // 结构建一次，之后只改属性。这样 CSS 动画不会被打断。
 const SCENE = {
-  GROUND: 290,
+  GROUND: 270,
   slots: [258, 470, 770, 975],
   posts: { oxygen: 196, farm: 442, water: 662, power: 886, mine: 1140 },
   built: false,
@@ -691,16 +691,14 @@ function buildScene() {
   const svg = document.getElementById("sceneSvg");
   const G0 = SCENE.GROUND;
 
-  const lamps = [320, 700, 1080].map(function (lx) {
-    return '<path d="M' + lx + ' 16 V40" stroke="#1a212a" stroke-width="2"/>' +
-      '<rect x="' + (lx - 15) + '" y="40" width="30" height="7" rx="3" fill="#2b3542"/>' +
-      '<circle cx="' + lx + '" cy="48" r="3" fill="#d29922" opacity=".8"/>' +
-      '<path class="lamp" d="M' + (lx - 14) + ' 52 L' + (lx + 14) + ' 52 L' + (lx + 50) + ' 108 L' + (lx - 50) + ' 108 Z" fill="#d29922"/>';
+  const lamps = [227, 623, 1021].map(function (lx) {
+    return '<path class="lamp" d="M' + (lx - 13) + ' 84 L' + (lx + 13) + ' 84 L' + (lx + 64) + ' 200 L' + (lx - 64) + ' 200 Z" fill="#ffb454"/>' +
+      '<circle cx="' + lx + '" cy="80" r="4" fill="#ffd08a" opacity=".5"/>';
   }).join("");
 
   const crops = [0, 1, 2, 3, 4].map(function (i) {
     const x = 308 + i * 32;
-    return '<path d="M' + x + ' 286 q -11 -22 0 -38"/><path d="M' + x + ' 278 q 12 -15 19 -20"/>';
+    return '<path d="M' + x + ' 266 q -11 -22 0 -38"/><path d="M' + x + ' 258 q 12 -15 19 -20"/>';
   }).join("");
 
   const people = SCENE.slots.map(function (_, i) {
@@ -729,7 +727,7 @@ function buildScene() {
         '<rect x="8" y="-16" width="22" height="4" rx="2" fill="#1d2530"/>' +
       '</g>' +
       '</g>' +
-      '<text id="nm' + i + '" y="20" text-anchor="middle" font-size="11"></text>' +
+      '<text id="nm' + i + '" y="15" text-anchor="middle" font-size="10"></text>' +
       '</g>';
   }).join("");
 
@@ -740,7 +738,7 @@ function buildScene() {
       '.fan.stop{animation:none}' +
       '@keyframes spin{to{transform:rotate(360deg)}}' +
       '.lamp{animation:lamp 5s ease-in-out infinite}' +
-      '@keyframes lamp{0%,100%{opacity:.03}50%{opacity:.1}}' +
+      '@keyframes lamp{0%,100%{opacity:.05}50%{opacity:.17}}' +
       '.who{transition:transform .65s cubic-bezier(.4,0,.3,1)}' +
       '.art{transition:transform .45s ease}' +
       '.nofx .who{transition:none}' +
@@ -756,19 +754,11 @@ function buildScene() {
     '</style>' +
 
     '<rect width="1264" height="320" fill="#070a0e"/>' +
-    '<path d="M0 16 H1264" stroke="#151b23" stroke-width="2"/>' +
-    '<path d="M0 21 H1264" stroke="#10161d" stroke-width="1"/>' +
+    '<image href="assets/bg.png" x="0" y="-62" width="1264" height="421"/>' +
     lamps +
-    '<rect y="' + (G0 + 2) + '" width="1264" height="30" fill="#0c1116"/>' +
-    '<path d="M0 ' + G0 + ' H1264" stroke="#242c36" stroke-width="2"/>' +
-    '<ellipse cx="120" cy="306" rx="10" ry="3" fill="#141a22"/>' +
-    '<ellipse cx="360" cy="312" rx="10" ry="3" fill="#141a22"/>' +
-    '<ellipse cx="600" cy="304" rx="10" ry="3" fill="#141a22"/>' +
-    '<ellipse cx="850" cy="314" rx="10" ry="3" fill="#141a22"/>' +
-    '<ellipse cx="1100" cy="307" rx="10" ry="3" fill="#141a22"/>' +
 
     // 制氧机
-    '<rect x="40" y="110" width="170" height="180" rx="10" fill="#121820" stroke="#252d38"/>' +
+    '<rect x="40" y="110" width="170" height="160" rx="10" fill="#080c12" fill-opacity=".82" stroke="#46566a" stroke-width="1.5"/>' +
     '<rect x="58" y="126" width="134" height="7" rx="3" fill="#1d2530"/>' +
     '<circle id="oRing" cx="105" cy="198" r="34" fill="#0a0e13" stroke-width="3"/>' +
     '<g id="oFan" class="fan" stroke-width="4" stroke-linecap="round">' +
@@ -776,16 +766,16 @@ function buildScene() {
     '<path d="M162 110 V70 H200" stroke="#2b3542" stroke-width="7" fill="none"/>' +
 
     // 农田
-    '<rect x="290" y="240" width="160" height="50" rx="6" fill="#171310"/>' +
+    '<rect x="290" y="222" width="160" height="48" rx="6" fill="#0d0a08" fill-opacity=".85" stroke="#4a3b2a" stroke-width="1.5"/>' +
     '<g id="crop" stroke-width="3.5" fill="none">' + crops + '</g>' +
 
     // 水箱
-    '<rect x="500" y="110" width="170" height="180" rx="10" fill="#0a0e13" stroke="#252d38"/>' +
+    '<rect x="500" y="110" width="170" height="160" rx="10" fill="#080c12" fill-opacity=".82" stroke="#46566a" stroke-width="1.5"/>' +
     '<rect id="wBody" class="wl" x="507" y="285" width="156" height="0" rx="5" fill="#1f6feb" opacity=".45"/>' +
     '<path id="wWave" class="wl" d="" stroke="#58a6ff" stroke-width="2" fill="none" opacity=".75"/>' +
 
     // 发电机
-    '<rect x="720" y="130" width="170" height="160" rx="10" fill="#121820" stroke="#252d38"/>' +
+    '<rect x="720" y="130" width="170" height="140" rx="10" fill="#080c12" fill-opacity=".82" stroke="#46566a" stroke-width="1.5"/>' +
     '<circle id="pRing" cx="782" cy="210" r="30" fill="#0a0e13" stroke-width="3"/>' +
     '<g id="pFan" class="fan" stroke-width="4" stroke-linecap="round">' +
       '<path d="M782 190 V230"/><path d="M762 210 H802"/>' +
@@ -793,10 +783,10 @@ function buildScene() {
     '<path d="M840 160 V120 h18" stroke="#2b3542" stroke-width="6" fill="none"/>' +
 
     // 矿道
-    '<path d="M950 290 A 90 90 0 0 1 1130 290 Z" fill="#030507"/>' +
-    '<path d="M950 290 A 90 90 0 0 1 1130 290" stroke="#2b3542" stroke-width="3" fill="none"/>' +
-    '<path id="crack" d="M980 232 L1010 254 L1000 278" stroke="#f85149" stroke-width="2.5" fill="none" opacity=".7" style="display:none"/>' +
-    '<text x="1040" y="310" text-anchor="middle" fill="#4b5563" font-size="12">矿道</text>' +
+    '<path d="M950 270 A 90 90 0 0 1 1130 270 Z" fill="#030507"/>' +
+    '<path d="M950 270 A 90 90 0 0 1 1130 270" stroke="#2b3542" stroke-width="3" fill="none"/>' +
+    '<path id="crack" d="M980 212 L1010 234 L1000 258" stroke="#f85149" stroke-width="2.5" fill="none" opacity=".7" style="display:none"/>' +
+    '<text x="1040" y="292" text-anchor="middle" fill="#4b5563" font-size="12">矿道</text>' +
 
     people +
 
@@ -826,8 +816,8 @@ function updateScene() {
   $("crop").setAttribute("stroke", lv(s.food));
 
   // 水箱
-  const wH = Math.max(0, Math.min(174, Math.round(174 * Math.min(100, s.water) / 100)));
-  const wy = 285 - wH;
+  const wH = Math.max(0, Math.min(154, Math.round(154 * Math.min(100, s.water) / 100)));
+  const wy = 265 - wH;
   $("wBody").setAttribute("y", wy);
   $("wBody").setAttribute("height", wH);
   $("wWave").setAttribute("d", wH > 3 ? "M507 " + wy + " q 39 -6 78 0 t 78 0" : "");
@@ -858,7 +848,7 @@ function updateScene() {
       nm.textContent = who.left ? "走了" : "空床";
       nm.setAttribute("fill", "#4b5563");
       applyPose(g, null);
-      art.style.transform = "scale(1.22)";
+      art.style.transform = "scale(1.1)";
       g.style.transform = "translate(" + x + "px," + G0 + "px)";
       return;
     }
@@ -873,7 +863,7 @@ function updateScene() {
     g.querySelector(".hd").setAttribute("fill", st >= 80 ? "#b9735a" : st >= 60 ? "#cfa87f" : "#c9a27c");
     g.classList.toggle("hot", st >= 60);
     applyPose(g, posts[i]);
-    art.style.transform = "rotate(" + lean + "deg) scale(1.22)";
+    art.style.transform = "rotate(" + lean + "deg) scale(1.1)";
     g.style.transform = "translate(" + x + "px," + G0 + "px)";
   });
 
@@ -888,7 +878,7 @@ function updateScene() {
   const x = post || SCENE.slots[idx];
   const bw = Math.max(84, say.length * 13 + 24);
   const bx = Math.max(10, Math.min(1264 - bw - 10, x - bw / 2));
-  const by = 158;
+  const by = 150;
   $("bubR").setAttribute("x", bx);
   $("bubR").setAttribute("y", by);
   $("bubR").setAttribute("width", bw);
