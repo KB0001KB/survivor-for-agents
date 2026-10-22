@@ -580,6 +580,9 @@ function checkEnd() {
   const gone = G.survivors.filter(p => p.left).length;
   if (gone >= G.survivors.length) {
     end("都走了", "第 " + G.day + " 天。四个人都圆满了，没有一个人留下。");
+  } else if (gone > 0) {
+    // 有人圆梦走了，剩下的没撑住。这不算"全灭"——有人是笑着走的。
+    end("没人了", "第 " + G.day + " 天。走的走了，剩下的也没撑住。");
   } else {
     end("全灭了", "最后一天是第 " + G.day + " 天。没有人活下来。");
   }
@@ -1609,11 +1612,15 @@ function awaken() {
   const list = document.getElementById("awakeList");
   if (G.runs.length) {
     list.innerHTML = G.runs.map(function (r, i) {
+      const d = r.dead || 0;
+      const who = d > 0 ? ("死了 " + d + " 个人") : "一个都没死";
       return '<div class="r"><b>第 ' + (i + 1) + ' 局</b>，第 ' + r.day + ' 天，<span class="w">' +
-        escapeHtml(r.why) + '</span>，走了 ' + r.dead + ' 个人。<span class="ok">—— 他们等到了。</span></div>';
+        escapeHtml(r.why) + '</span>，' + who + '。<span class="ok">—— 他们等到了。</span></div>';
     }).join("");
     G.runs.forEach(function (r, i) {
-      log("第 " + (i + 1) + " 局，第 " + r.day + " 天，" + r.why + "，走了 " + r.dead + " 个人。—— 他们等到了。", "ok");
+      const d = r.dead || 0;
+      log("第 " + (i + 1) + " 局，第 " + r.day + " 天，" + r.why + "，" +
+        (d > 0 ? ("死了 " + d + " 个人") : "一个都没死") + "。—— 他们等到了。", "ok");
     });
   } else {
     list.innerHTML = '<div class="r">这一次是第一次。没有人等过。</div>';
@@ -1626,7 +1633,9 @@ function awaken() {
 function end(title, text) {
   G.over = true;
   const wrote = G.theory || 0;
-  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title, notes: wrote });
+  // 圆梦走掉的人 alive 也是 false，不能算进死者里
+  const died = G.survivors.filter(p => !p.alive && !p.left).length;
+  G.runs.push({ day: G.day, dead: died, why: title, notes: wrote });
 
   // 好好收尾的人，才在书上留得下一笔。全员惨死的局，什么也带不走。
   const gift = title !== "全灭了" && !G.awakened;

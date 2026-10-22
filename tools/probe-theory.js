@@ -63,6 +63,8 @@ async function main() {
   show("写完一条", await snap());
   await ev(() => nextDay());
   show("过夜", await snap());
+  console.log("  面板文字：" +
+    (await ev(() => document.getElementById("awakeList").innerText)).replace(/\n+/g, " / "));
 
   // B. 23 条，不点，直接过夜 —— 不该醒
   H("B 23 条直接过夜");
