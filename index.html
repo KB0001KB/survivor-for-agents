@@ -574,6 +574,7 @@ function saveRun() {
       oxygenDays: G.oxygenDays, foodDays: G.foodDays, waterDays: G.waterDays,
       rollCallPending: G.rollCallPending, lastOneLogged: G.lastOneLogged, awakened: G.awakened,
       posts: G.posts,
+      badStreak: G.badStreak,
       log: G.log.slice(-120),
       over: G.over,
     }));
@@ -601,6 +602,7 @@ function loadRun() {
     G.lastOneLogged = !!d.lastOneLogged;
     G.awakened = !!d.awakened;
     G.posts = Array.isArray(d.posts) ? d.posts : [null, null, null, null];
+    G.badStreak = d.badStreak || 0;
     G.log = d.log || [];
     G.over = false;
     return true;
@@ -1066,90 +1068,94 @@ function sendToWork(id) {
 
 // ---------- 一天结束 ----------
 // ---------- 夜里的事 ----------
-// 每天结束有 45% 的概率来一件。不是惩罚，是让局面没法被算尽。
-// 有些事跟性格有关——那个人是谁，事就不一样。
+// 每天结束有一定概率来一件。不是惩罚，是让局面没法被算尽。
+// 坏的幅度都压过——它不该比一次决策失误更致命。
+// 还有一条：连着倒霉两次，第三次一定转运。谁来都不好使的局，不好玩。
 const EVENTS = [
-  { w: 3, run() { G.res.water -= 15; return "水管冻裂了，接了一夜。水 -15。"; } },
-  { w: 2, run() { G.res.oxygen -= 10; return "制氧机响了一夜，比平时难听。氧气 -10。"; } },
-  { w: 2, run() { G.res.power -= 20; return "跳闸了。摸黑换保险丝，电力 -20。"; } },
-  { w: 2, run() { G.res.food -= 12; return "老鼠咬破了粮袋，撒了一地。食物 -12。"; } },
-  { w: 2, run() {
-      G.res.material -= 10;
-      alive().forEach(p => { p.stress += 3; });
-      return "顶板掉了渣，砸在桌上。材料 -10，所有人心里一紧。";
+  // --- 坏 ---
+  { kind: "bad", w: 3, run() { G.res.water -= 10; return "水管冻裂了，接了一夜。水 -10。"; } },
+  { kind: "bad", w: 2, run() { G.res.oxygen -= 7; return "制氧机响了一夜，比平时难听。氧气 -7。"; } },
+  { kind: "bad", w: 2, run() { G.res.power -= 14; return "跳闸了。摸黑换保险丝，电力 -14。"; } },
+  { kind: "bad", w: 2, run() { G.res.food -= 8; return "老鼠咬破了粮袋，撒了一地。食物 -8。"; } },
+  { kind: "bad", w: 2, run() {
+      G.res.material -= 7;
+      alive().forEach(p => { p.stress += 2; });
+      return "顶板掉了渣，砸在桌上。材料 -7，所有人心里一紧。";
   } },
-  { w: 2, run() {
+  { kind: "bad", w: 2, run() {
       const a = alive(); if (!a.length) return null;
       const p = a[Math.floor(Math.random() * a.length)];
-      p.stress += 18;
-      return p.name + "发烧了，一夜说胡话。压力 +18。";
+      p.stress += 12;
+      return p.name + "发烧了，一夜说胡话。压力 +12。";
   } },
-  { w: 2, run() {
-      alive().forEach(p => { p.stress += 6; });
-      return "霜顺着墙根长出来，谁也没说话。所有人压力 +6。";
+  { kind: "bad", w: 2, run() {
+      alive().forEach(p => { p.stress += 4; });
+      return "霜顺着墙根长出来，谁也没说话。所有人压力 +4。";
   } },
 
-  { w: 2, run() { G.res.material += 30; return "在塌方的地方翻出半截旧管道。材料 +30。"; } },
-  { w: 2, run() { G.res.food += 25; return "有人从柜子最里头摸出半箱罐头。食物 +25。"; } },
-  { w: 1, run() { G.res.power += 15; return "翻出一块还有余量的电瓶。电力 +15。"; } },
-  { w: 1, run() {
+  // --- 好 ---
+  { kind: "good", w: 2, run() { G.res.material += 30; return "在塌方的地方翻出半截旧管道。材料 +30。"; } },
+  { kind: "good", w: 2, run() { G.res.food += 25; return "有人从柜子最里头摸出半箱罐头。食物 +25。"; } },
+  { kind: "good", w: 1, run() { G.res.power += 15; return "翻出一块还有余量的电瓶。电力 +15。"; } },
+  { kind: "good", w: 1, run() {
       alive().forEach(p => { p.stress = Math.max(0, p.stress - 8); });
       return "不知道谁先哼起一支歌。所有人压力 -8。";
   } },
 
-  { w: 2, run() {
+  // --- 只是发生了一下 ---
+  { kind: "neutral", w: 2, run() {
       const a = alive(); if (!a.length) return null;
       const p = a[Math.floor(Math.random() * a.length)];
       p.bond = Math.min(100, p.bond + 5);
       p.stress = Math.max(0, p.stress - 5);
       return "无线电里飘出半句人话，很快又没了。" + p.name + "说那是有人在讲话。";
   } },
-  { w: 2, run() {
+  { kind: "neutral", w: 2, run() {
       const a = alive(); if (!a.length) return null;
       const p = a[Math.floor(Math.random() * a.length)];
       p.stress = Math.max(0, p.stress - 5);
       return p.name + "在墙上刻了一道，又刻了一道。";
   } },
 
-  // 性格的后果：换个人，同一件事就不一样
-  { w: 2, run() {
+  // --- 性格的后果：换个人，同一件事就不一样 ---
+  { kind: "bad", w: 2, run() {
       const p = pickTrait("爱干净"); if (!p) return null;
       G.res.water -= 12; p.stress = Math.max(0, p.stress - 16);
       return p.name + "把地擦了一整夜。水 -12，他松快了些。";
   } },
-  { w: 2, run() {
+  { kind: "bad", w: 2, run() {
       const p = pickTrait("什么都吃"); if (!p) return null;
       G.res.food -= 15; p.stress = Math.max(0, p.stress - 14);
       return p.name + "半夜起来吃了一顿。食物 -15，他好受了。";
   } },
-  { w: 2, run() {
+  { kind: "good", w: 2, run() {
       const p = pickTrait("话多"); if (!p) return null;
       alive().forEach(q => { q.stress = Math.max(0, q.stress - 5); });
       return p.name + "讲了个很长的故事，讲到后半夜。所有人压力 -5。";
   } },
-  { w: 2, run() {
+  { kind: "bad", w: 2, run() {
       const p = pickTrait("急性子"); if (!p) return null;
       alive().forEach(q => { q.stress += 3; });
       p.stress += 6;
       return p.name + "来回踱了一整夜。谁也没睡好。";
   } },
-  { w: 2, run() {
+  { kind: "bad", w: 2, run() {
       const p = pickTrait("懒"); if (!p) return null;
       G.points = Math.max(0, G.points - 1);
       p.stress = Math.max(0, p.stress - 12);
       return p.name + "睡过了，没人叫他。今天少一个人手。";
   } },
-  { w: 1, run() {
+  { kind: "bad", w: 1, run() {
       const p = pickTrait("胆小鬼"); if (!p) return null;
       p.stress += 10;
       return p.name + "说墙里有声音。没人接他的话。";
   } },
-  { w: 1, run() {
+  { kind: "good", w: 1, run() {
       const p = pickTrait("记性好"); if (!p) return null;
       p.stress = Math.max(0, p.stress - 6);
       return p.name + "把日子又数了一遍，数到哪儿就是哪儿。";
   } },
-  { w: 1, run() {
+  { kind: "neutral", w: 1, run() {
       const p = pickTrait("沉默"); if (!p) return null;
       p.bond = Math.min(100, p.bond + 4);
       return p.name + "坐在门口抽了半支不知道哪来的烟。";
@@ -1161,20 +1167,34 @@ function pickTrait(t) {
   return a.length ? a[Math.floor(Math.random() * a.length)] : null;
 }
 
+// 从指定种类的池子里按权重抽一条
+function pickEvent(kind) {
+  const pool = kind ? EVENTS.filter(e => e.kind === kind) : EVENTS;
+  const total = pool.reduce((s, e) => s + e.w, 0);
+  let r = Math.random() * total;
+  for (let k = 0; k < pool.length; k++) {
+    r -= pool[k].w;
+    if (r <= 0) return pool[k];
+  }
+  return pool[pool.length - 1];
+}
+
 function rollEvent() {
   if (G.awakened) return;
-  if (Math.random() > 0.45) return;
-  const total = EVENTS.reduce((s, e) => s + e.w, 0);
-  let r = Math.random() * total;
-  for (let k = 0; k < EVENTS.length; k++) {
-    r -= EVENTS[k].w;
-    if (r <= 0) {
-      const text = EVENTS[k].run();
-      if (text) log(text, "warn");
-      clampAll();
-      return;
-    }
+  if (Math.random() > 0.38) return;
+
+  // 连着两次倒霉，第三次强制给件好事
+  const forced = (G.badStreak || 0) >= 2 ? "good" : null;
+  if (forced) G.badStreak = 0;
+
+  const e = pickEvent(forced);
+  const text = e.run();
+  if (text) log(text, e.kind === "bad" ? "warn" : e.kind === "good" ? "ok" : "dim");
+  if (!forced) {
+    if (e.kind === "bad") G.badStreak = (G.badStreak || 0) + 1;
+    else G.badStreak = 0;
   }
+  clampAll();
 }
 
 function nextDay() {
