@@ -118,8 +118,21 @@
     border-color:var(--accent); color:var(--accent); font-size:15px;
   }
 
+  #night{
+    margin:0 12px 6px; height:34px; display:flex; align-items:center; gap:10px;
+    padding:0 12px; border-radius:6px; font-size:12.5px;
+    background:#1a1508; border:1px solid #4a3a12; color:var(--warn);
+  }
+  #night.hide{ visibility:hidden; }
+  #night .fix{
+    margin-left:auto; height:24px; padding:0 12px; cursor:pointer;
+    background:#2a2110; border:1px solid var(--warn); color:var(--warn);
+    border-radius:4px; font-family:inherit; font-size:12px;
+  }
+  #night .fix:disabled{ opacity:.35; cursor:not-allowed; }
+
   #log{
-    margin:0 12px 12px; height:96px; overflow-y:auto;
+    margin:0 12px 12px; height:76px; overflow-y:auto;
     background:#0b0f14; border:1px solid var(--line); border-radius:6px;
     padding:10px; font-size:12.5px; line-height:1.7;
   }
@@ -208,6 +221,7 @@
 
 <button id="next">结束今天</button>
 
+<div id="night" class="hide"><span id="nightTx"></span><button class="fix" id="nightBtn"></button></div>
 <div id="log"></div>
 
 </div><!-- /#ui -->
@@ -574,7 +588,7 @@ function saveRun() {
       oxygenDays: G.oxygenDays, foodDays: G.foodDays, waterDays: G.waterDays,
       rollCallPending: G.rollCallPending, lastOneLogged: G.lastOneLogged, awakened: G.awakened,
       posts: G.posts,
-      badStreak: G.badStreak,
+      badStreak: G.badStreak, remedy: G.remedy,
       log: G.log.slice(-120),
       over: G.over,
     }));
@@ -603,6 +617,7 @@ function loadRun() {
     G.awakened = !!d.awakened;
     G.posts = Array.isArray(d.posts) ? d.posts : [null, null, null, null];
     G.badStreak = d.badStreak || 0;
+    G.remedy = d.remedy || null;
     G.log = d.log || [];
     G.over = false;
     return true;
@@ -1016,6 +1031,7 @@ function render() {
   document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
   document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
   renderLog();
+  renderRemedy();
   renderScene();
   saveRun();
 }
@@ -1073,10 +1089,10 @@ function sendToWork(id) {
 // 还有一条：连着倒霉两次，第三次一定转运。谁来都不好使的局，不好玩。
 const EVENTS = [
   // --- 坏 ---
-  { kind: "bad", w: 3, run() { G.res.water -= 10; return "水管冻裂了，接了一夜。水 -10。"; } },
-  { kind: "bad", w: 2, run() { G.res.oxygen -= 7; return "制氧机响了一夜，比平时难听。氧气 -7。"; } },
-  { kind: "bad", w: 2, run() { G.res.power -= 14; return "跳闸了。摸黑换保险丝，电力 -14。"; } },
-  { kind: "bad", w: 2, run() { G.res.food -= 8; return "老鼠咬破了粮袋，撒了一地。食物 -8。"; } },
+  { kind: "bad", w: 3, run() { G.res.water -= 10; G.remedy = { text: "水管冻裂了，还在漏。", cost: { material: 8 }, give: { water: 6 } }; return "水管冻裂了，接了一夜。水 -10。"; } },
+  { kind: "bad", w: 2, run() { G.res.oxygen -= 7; G.remedy = { text: "制氧机卡住了，还没停。", cost: { material: 6 }, give: { oxygen: 5 } }; return "制氧机响了一夜，比平时难听。氧气 -7。"; } },
+  { kind: "bad", w: 2, run() { G.res.power -= 14; G.remedy = { text: "线路烧了，还能接上。", cost: { material: 10 }, give: { power: 10 } }; return "跳闸了。摸黑换保险丝，电力 -14。"; } },
+  { kind: "bad", w: 2, run() { G.res.food -= 8; G.remedy = { text: "粮袋破了，地上还捡得回来。", cost: { power: 4 }, give: { food: 5 } }; return "老鼠咬破了粮袋，撒了一地。食物 -8。"; } },
   { kind: "bad", w: 2, run() {
       G.res.material -= 7;
       alive().forEach(p => { p.stress += 2; });
@@ -1197,6 +1213,47 @@ function rollEvent() {
   clampAll();
 }
 
+// ---------- 补救 ----------
+// 事情照常发生，但如果手上有东西，还能捞回来一点。
+const RES_NAME = { oxygen: "氧气", water: "水", food: "食物", power: "电力", material: "材料" };
+
+function costText(r) {
+  const parts = [];
+  Object.keys(r.cost).forEach(k => { parts.push(r.cost[k] + " " + (RES_NAME[k] || k)); });
+  const back = [];
+  Object.keys(r.give).forEach(k => { back.push((RES_NAME[k] || k) + " +" + r.give[k]); });
+  return "花 " + parts.join("、") + "，换回 " + back.join("、");
+}
+
+function canRemedy(r) {
+  if (!r) return false;
+  return Object.keys(r.cost).every(k => (G.res[k] || 0) >= r.cost[k]);
+}
+
+function applyRemedy() {
+  const r = G.remedy;
+  if (!r || !canRemedy(r)) return;
+  Object.keys(r.cost).forEach(k => { G.res[k] = Math.max(0, G.res[k] - r.cost[k]); });
+  Object.keys(r.give).forEach(k => { G.res[k] += r.give[k]; });
+  log("补上了。" + costText(r), "ok");
+  G.remedy = null;
+  clampAll();
+  render();
+}
+
+function renderRemedy() {
+  const night = document.getElementById("night");
+  const tx = document.getElementById("nightTx");
+  const btn = document.getElementById("nightBtn");
+  if (!night || !tx || !btn) return;
+  const r = G.remedy;
+  if (!r || G.over) { night.classList.add("hide"); return; }
+  night.classList.remove("hide");
+  tx.textContent = r.text;
+  btn.textContent = costText(r);
+  btn.disabled = !canRemedy(r) || G.paused;
+}
+
 function nextDay() {
   if (G.over || G.paused) return;
   G.posts = [null, null, null, null];
@@ -1267,6 +1324,9 @@ function nextDay() {
   G.day += 1;
   G.points = BAL.pointsPerDay;
   G.survivors.forEach(p => { p.talked = false; });
+
+  // 昨天那件事，今天就不再是机会了
+  G.remedy = null;
 
   // 夜里出的事
   rollEvent();
@@ -1410,6 +1470,7 @@ document.querySelectorAll("#choice button").forEach(b => {
   b.addEventListener("click", () => chooseEnding(b.dataset.c));
 });
 
+document.getElementById("nightBtn").addEventListener("click", applyRemedy);
 document.getElementById("next").addEventListener("click", nextDay);
 
 // ---------- 启动 ----------
