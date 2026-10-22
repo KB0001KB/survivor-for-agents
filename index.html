@@ -1103,7 +1103,9 @@ function render() {
   document.getElementById("day").textContent = G.day;
   document.getElementById("points").textContent = G.points + " / " + BAL.pointsPerDay;
   document.getElementById("tech").textContent =
-    "科技 " + G.techLevel + " 级" + (G.tech > 0 ? "（" + G.tech + "/" + BAL.techPerLevel + "）" : "");
+    "科技 " + G.techLevel + " 级" +
+    (G.techLevel >= 3 ? " · 到头了"
+      : (G.tech > 0 ? "（" + G.tech + "/" + BAL.techPerLevel + "）" : ""));
 
   const people = document.getElementById("people");
   people.innerHTML = G.survivors.map((p, i) => {
@@ -1143,8 +1145,8 @@ function render() {
     // 提示写在日志里没人看，就写在按钮自己身上
     const sub = (a.id === "study" && G.theoryTotal >= 6)
       ? "-12 材料 · 有半页是别人写的"
-      : a.sub;
-    return '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
+      : (maxed(a) ? "已经改到头了" : a.sub);
+    return '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !maxed(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
       a.name + '<small>' + sub + '</small></button>';
   }).join("");
   acts.querySelectorAll("button").forEach(b => {
@@ -1180,6 +1182,11 @@ function tooPoor(a) {
   return a.mat ? G.res.material < a.mat : false;
 }
 
+// 应用研究有头。三级到顶，再投就是白烧材料。
+function maxed(a) {
+  return a.id === "apply" && G.techLevel >= 3;
+}
+
 // ---------- 和一个人说话 ----------
 function talkTo(i) {
   const p = G.survivors[i];
@@ -1203,6 +1210,7 @@ function doAction(id) {
   const a = ACTIONS.find(x => x.id === id);
   if (!a) return;
   if (tooPoor(a)) { log("材料不够，" + a.name + "做不了。", "warn"); return; }
+  if (maxed(a)) { log("应用研究改到头了。再改也不会更好。", "warn"); return; }
   if ((G.blackout || 0) >= 2 && G.res.power <= 0 && a.pw) { log("停电了，" + a.name + "开不动。", "warn"); return; }
   const text = a.run(G.res, G);
   G.points -= 1;
