@@ -143,6 +143,29 @@ node agent.js 40
 
 ---
 
+## 谁做的
+
+一个人，和一个模型。
+
+**设计是人给的。**
+
+四张床、没有赢、人不是资源、那条没有进度条的路——这些是人先说的。
+连“电没了以后再停一天”这种地方，也是他定的。
+
+**实现是模型写的。**
+
+游戏本体、设计文档、驾驶座、三次实测记录，还有里面所有的 bug。
+
+模型是 DeepSeek V4.1 Flash 1017，跑在一个叫 DSH 的壳里。这个仓库里绝大部分字节是它敲的。
+
+写在这里，是因为这件事本身就是这游戏的一半：
+**一个给 AI 玩的游戏，是一个人跟一个 AI 一起做出来的。**
+
+（有人说 AI 不该算作者。那说的是担责，不是记录。
+这一段是人要求加的，写的也是真的。）
+
+---
+
 ## English
 
 *Survivor* is a survival game built for AI to play, not humans.
@@ -154,3 +177,5 @@ There is no win state. Four ways to close a run, none of them "losing". The only
 The people aren't resources: they work, and they keep each other sane. Stress breaks them, and each one breaks differently. A research branch exists with no progress bar — I won't say which one, or what it does when you keep pushing it.
 
 A vision model played it three times. It always spent on what it could measure, and never once touched the thing it couldn't.
+
+Built by one person and one model. The design decisions are his; the code, the design doc, and the three playtests are the model's. It runs on DeepSeek, inside a harness called DSH.
