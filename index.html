@@ -154,9 +154,15 @@
   #choice{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
     display:none; align-items:center; justify-content:center;
+    z-index:30;
   }
   #choice.show{ display:flex; }
-  #choice .box{ width:520px; }
+  #choice .box{
+    width:520px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:24px 28px;
+  }
+  #choice h2{ font-size:18px; margin-bottom:8px; }
+  #choice p{ color:var(--dim); font-size:13px; line-height:1.7; }
   #choice .choices{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0; }
   #choice .choices button{
     background:#21262d; border:1px solid var(--line); color:var(--text);
@@ -202,6 +208,7 @@
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
     display:none; align-items:center; justify-content:center;
+    z-index:35;
   }
   #over.show{display:flex;}
   #over .box{
@@ -210,6 +217,7 @@
   }
   #over h2{font-size:20px; margin-bottom:12px;}
   #over p{color:var(--dim); margin-bottom:18px; line-height:1.8;}
+  #over .note{color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:20px;}
   #over button{
     background:#21262d; border:1px solid var(--accent); color:var(--accent);
     border-radius:6px; padding:8px 20px; cursor:pointer; font-family:inherit;
@@ -302,6 +310,7 @@
 <div id="over"><div class="box">
   <h2 id="over-title"></h2>
   <p id="over-text"></p>
+  <p id="over-note" class="note"></p>
   <button onclick="location.reload()">再来一局</button>
 </div></div>
 
@@ -323,7 +332,7 @@ const BAL = {
   pointsPerDay: 4,
   deathOxygenDays: 2,
   techPerLevel: 3,
-  revealAt: 60,
+  revealAt: 24,
 };
 
 const ACTIONS = [
@@ -644,7 +653,12 @@ function fresh() {
   log("第一天。四张床，一台快报废的制氧机。", "sys");
   log("点名：" + G.survivors.map(p => p.name).join("、") + "。都在。", "dim");
   if (G.theoryTotal > 0) {
-    log("（这本书上记着 " + G.theoryTotal + " 条没写完的笔记。）", "sys");
+    const n = G.theoryTotal;
+    // 不给进度条，但每局看到的不是同一句话。
+    const tail = n >= 16 ? "前面几页的字开始对得上了。"
+               : n >= 8  ? "有几页开始写同样的话了。"
+               : "有些页还是空白。";
+    log("（这本书上记着 " + n + " 条没写完的笔记。" + tail + "）", "sys");
   }
 }
 
@@ -1578,10 +1592,15 @@ function awaken() {
 
 function end(title, text) {
   G.over = true;
-  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title });
+  G.runs.push({ day: G.day, dead: 4 - alive().length, why: title, notes: G.theory || 0 });
   saveGame();
   document.getElementById("over-title").textContent = title;
   document.getElementById("over-text").textContent = text;
+  // 死了六次，总得知道每次没白死。这一行是那条路存在的唯一凭证。
+  const n = G.theory || 0;
+  document.getElementById("over-note").textContent = n > 0
+    ? ("这一局你写下了 " + n + " 条笔记。这本书现在有 " + G.theoryTotal + " 条。")
+    : "这一局没有留下笔记。";
   document.getElementById("over").classList.add("show");
   render();
 }
