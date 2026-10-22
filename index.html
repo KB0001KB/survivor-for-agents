@@ -419,6 +419,7 @@ const G = {
   techLevel: 0,
   runs: SAVE.runs || [],
   awakened: false,
+  rollCallPending: false,
   oxygenDays: 0,
   survivors: [],
   over: false,
@@ -440,6 +441,7 @@ function fresh() {
   }));
   G.log = [];
   log("第一天。四张床，一台快报废的制氧机。", "sys");
+  log("点名：" + G.survivors.map(p => p.name).join("、") + "。都在。", "dim");
   if (G.theoryTotal > 0) {
     log("（这本书上记着 " + G.theoryTotal + " 条没写完的笔记。）", "sys");
   }
@@ -612,6 +614,7 @@ function nextDay() {
       if (a.length) {
         const victim = a[Math.floor(Math.random() * a.length)];
         victim.alive = false;
+        G.rollCallPending = true;
         log(victim.name + " 没撑过去。", "bad");
         G.survivors.forEach(p => { if (p.alive) { p.stress += 20; p.bond = Math.max(0, p.bond - 5); } });
         log("剩下的人沉默了一整天。所有人压力 +20，也没那么信你了。", "warn");
@@ -632,6 +635,13 @@ function nextDay() {
   G.day += 1;
   G.points = BAL.pointsPerDay;
   G.survivors.forEach(p => { p.talked = false; });
+
+  // 有人没了，第二天点名会少一个
+  if (G.rollCallPending) {
+    G.rollCallPending = false;
+    const emptyBeds = G.survivors.filter(p => !p.alive && !p.left).length;
+    log("点名：" + alive().map(p => p.name).join("、") + "。" + emptyBeds + " 张床空着。", "dim");
+  }
 
   // 愿望说了却一直没圆的人，会嘟囔一句
   const murmur = G.survivors.filter(p => p.alive && p.wishKnown && !p.left);
