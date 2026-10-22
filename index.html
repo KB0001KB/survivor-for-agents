@@ -388,7 +388,7 @@ const ACTIONS = [
       }
       return "拆了改、改了拆，攒了点东西。科技 +1（" + G.tech + "/" + need + "）";
   }},
-  { id:"study",name:"基础理论", sub:"-12 材料", mat:12, run(s){
+  { id:"study",name:"基础理论", sub:"-12 材料 · 不占行动点", mat:12, free:1, run(s){
       s.material -= 12;
       G.theory += 1;
       G.theoryTotal += 1;
@@ -1142,11 +1142,10 @@ function render() {
   // 发电之后当场就能开机，不用等第二天
   const dark = (G.blackout || 0) >= 2 && G.res.power <= 0;
   acts.innerHTML = ACTIONS.map(a => {
-    // 提示写在日志里没人看，就写在按钮自己身上
-    const sub = (a.id === "study" && G.theoryTotal >= 6)
-      ? "-12 材料 · 有半页是别人写的"
-      : (maxed(a) ? "已经改到头了" : a.sub);
-    return '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !maxed(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
+    // 不占行动点的动作，白天用完了也还能点
+    const usable = a.free ? (!G.over && !G.paused) : canAct();
+    const sub = maxed(a) ? "已经改到头了" : a.sub;
+    return '<button class="act" data-id="' + a.id + '"' + (usable && !tooPoor(a) && !maxed(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
       a.name + '<small>' + sub + '</small></button>';
   }).join("");
   acts.querySelectorAll("button").forEach(b => {
@@ -1206,14 +1205,16 @@ function talkTo(i) {
 
 // ---------- 行动 ----------
 function doAction(id) {
-  if (!canAct()) return;
   const a = ACTIONS.find(x => x.id === id);
   if (!a) return;
+  if (G.over || G.paused) return;
+  // 不占行动点的事，白天用完了也能做
+  if (!a.free && !canAct()) return;
   if (tooPoor(a)) { log("材料不够，" + a.name + "做不了。", "warn"); return; }
   if (maxed(a)) { log("应用研究改到头了。再改也不会更好。", "warn"); return; }
   if ((G.blackout || 0) >= 2 && G.res.power <= 0 && a.pw) { log("停电了，" + a.name + "开不动。", "warn"); return; }
   const text = a.run(G.res, G);
-  G.points -= 1;
+  if (!a.free) G.points -= 1;
   clampAll();
   log(text, a.id === "study" ? "sys" : "");
   sendToWork(id);
