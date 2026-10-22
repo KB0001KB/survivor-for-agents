@@ -451,6 +451,50 @@ function fresh() {
   }
 }
 
+// ---------- 当前这一局的存档 ----------
+const RUN_KEY = "survival.run.v1";
+
+function saveRun() {
+  try {
+    localStorage.setItem(RUN_KEY, JSON.stringify({
+      v: 1,
+      day: G.day, points: G.points, res: G.res, sur: G.survivors,
+      theory: G.theory, tech: G.tech, techLevel: G.techLevel,
+      oxygenDays: G.oxygenDays, foodDays: G.foodDays, waterDays: G.waterDays,
+      rollCallPending: G.rollCallPending, awakened: G.awakened,
+      log: G.log.slice(-120),
+      over: G.over,
+    }));
+  } catch (e) { /* file:// 下可能被禁 */ }
+}
+
+function loadRun() {
+  try {
+    const raw = localStorage.getItem(RUN_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (d.v !== 1 || d.over) return false;
+    if (!Array.isArray(d.sur) || d.sur.length !== 4) return false;
+    G.day = d.day;
+    G.points = d.points;
+    G.res = d.res;
+    G.survivors = d.sur;
+    G.theory = d.theory || 0;
+    G.tech = d.tech || 0;
+    G.techLevel = d.techLevel || 0;
+    G.oxygenDays = d.oxygenDays || 0;
+    G.foodDays = d.foodDays || 0;
+    G.waterDays = d.waterDays || 0;
+    G.rollCallPending = !!d.rollCallPending;
+    G.awakened = !!d.awakened;
+    G.log = d.log || [];
+    G.over = false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function res() { return G.res; }
 
 function alive() { return G.survivors.filter(p => p.alive); }
@@ -561,6 +605,8 @@ function render() {
   document.getElementById("next").disabled = G.over || G.paused;
   document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
   document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
+  renderLog();
+  saveRun();
 }
 
 function canAct() {
@@ -784,7 +830,7 @@ document.getElementById("next").addEventListener("click", nextDay);
 
 // ---------- 启动 ----------
 G.res = Object.assign({}, BAL.start);
-fresh();
+if (!loadRun()) fresh();
 render();
 </script>
 </body>
