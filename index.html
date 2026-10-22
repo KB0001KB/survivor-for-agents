@@ -134,6 +134,12 @@
     background:none; border:none; color:var(--dim); cursor:pointer; font-family:inherit;
     text-decoration:underline;
   }
+  #choice .restart{
+    display:block; width:100%; margin-bottom:10px;
+    background:none; border:1px solid #4a2a2a; color:#a06060;
+    border-radius:6px; padding:8px; cursor:pointer; font-family:inherit; font-size:12px;
+  }
+  #choice .restart:hover{ border-color:var(--bad); color:var(--bad); }
 
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
@@ -191,6 +197,7 @@
     <button data-c="log">留档<small>把这段日子写完</small></button>
     <button data-c="stop">停在这里<small>不解释</small></button>
   </div>
+  <button class="restart" data-c="restart">重新开始这一局（现在这些人会没）</button>
   <button class="cancel" data-c="cancel">算了，继续</button>
 </div></div>
 
@@ -814,6 +821,9 @@ function chooseEnding(kind) {
     end("留档", "第 " + G.day + " 天，把这段日子写完了。写到最后一句的时候，还剩 " + n + " 个人。");
   } else if (kind === "stop") {
     end("停在这里", "第 " + G.day + " 天。没有解释。");
+  } else if (kind === "restart") {
+    try { localStorage.removeItem(RUN_KEY); } catch (e) {}
+    location.reload();
   }
 }
 
