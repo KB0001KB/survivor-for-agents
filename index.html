@@ -98,6 +98,31 @@
   #log .sys{color:var(--accent);}
   #log .dim{color:#6e7681;}
 
+  #quit{
+    margin-left:auto; height:26px; padding:0 10px;
+    background:#21262d; border:1px solid var(--line); color:var(--dim);
+    border-radius:4px; cursor:pointer; font-family:inherit; font-size:12px;
+  }
+  #quit:hover{ border-color:var(--warn); color:var(--warn); }
+
+  #choice{
+    position:fixed; inset:0; background:rgba(0,0,0,.82);
+    display:none; align-items:center; justify-content:center;
+  }
+  #choice.show{ display:flex; }
+  #choice .box{ width:520px; }
+  #choice .choices{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0; }
+  #choice .choices button{
+    background:#21262d; border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:10px; cursor:pointer; font-family:inherit; text-align:left;
+  }
+  #choice .choices button:hover{ border-color:var(--accent); }
+  #choice .choices small{ display:block; color:var(--dim); font-size:11px; margin-top:4px; }
+  #choice .cancel{
+    background:none; border:none; color:var(--dim); cursor:pointer; font-family:inherit;
+    text-decoration:underline;
+  }
+
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
     display:none; align-items:center; justify-content:center;
@@ -132,6 +157,7 @@
   <span>行动点 <b id="points">4</b></span>
   <span id="tech"></span>
   <span id="hint"></span>
+  <button id="quit">宣布结束</button>
 </div>
 
 <div id="people"></div>
@@ -141,6 +167,18 @@
 <button id="next">结束今天</button>
 
 <div id="log"></div>
+
+<div id="choice"><div class="box">
+  <h2>宣布结束</h2>
+  <p>这不是失败。选一种收尾就行。</p>
+  <div class="choices">
+    <button data-c="evac">撤离<small>带一部分人走（40 电 / 60 材料）</small></button>
+    <button data-c="seal">封存<small>冻起来等以后（60 电）</small></button>
+    <button data-c="log">留档<small>把这段日子写完</small></button>
+    <button data-c="stop">停在这里<small>不解释</small></button>
+  </div>
+  <button class="cancel" data-c="cancel">算了，继续</button>
+</div></div>
 
 <div id="over"><div class="box">
   <h2 id="over-title"></h2>
@@ -281,6 +319,25 @@ const WISH_MUTTER = {
   bath: ["水凉了。", "算了。", "我不说了。", "……"],
   signal: ["刚刚……好像有声音。", "没事，我听错了。", "你有没有觉得太安静了。"],
   noodle: ["我不饿。", "那个……算了。", "梦里吃到了一半。"],
+};
+
+const CRASH = {
+  "阿岩": {
+    act: "躺平", text: "躺在地上一动不动，谁叫都不应。今天他不干了。",
+    apply: (s, g) => { g.points = Math.max(0, g.points - 1); },
+  },
+  "小满": {
+    act: "发疯似的擦洗", text: "把地板擦了三遍，又一桶水没了。",
+    apply: (s) => { s.water = Math.max(0, s.water - 20); },
+  },
+  "石头": {
+    act: "把自己关起来", text: "把自己锁进储物间，谁敲门都不开。其他人开始互相猜。",
+    apply: (s, g) => { g.survivors.forEach(q => { if (q.alive) q.bond = Math.max(0, q.bond - 3); }); },
+  },
+  "阿豆": {
+    act: "暴食", text: "把存着的那点口粮吃掉一大半。",
+    apply: (s) => { s.food = Math.max(0, s.food - 25); },
+  },
 };
 
 function grantWish(i) {
@@ -433,7 +490,7 @@ function render() {
   people.innerHTML = G.survivors.map((p, i) => {
     const w = Math.min(100, p.stress);
     const c = w >= 80 ? "var(--bad)" : w >= 50 ? "var(--warn)" : "var(--ok)";
-    let st = !p.alive ? (p.left ? "走了" : "已经不在了") : p.stress >= 60 ? "绷得很紧" : p.stress >= 30 ? "有点累" : "还行";
+    let st = !p.alive ? (p.left ? "走了" : "床空着") : p.stress >= 60 ? "绷得很紧" : p.stress >= 30 ? "有点累" : "还行";
     if (p.alive && p.bond < 30) st += " · 不太信你";
     const b = Math.round(p.bond);
     const canTalk = p.alive && !p.talked && !G.over && !G.paused;
@@ -570,13 +627,20 @@ function nextDay() {
     log(mp.name + "：" + pool[Math.floor(Math.random() * pool.length)], "dim");
   }
 
-  // 崩溃：崩掉的人第二天什么也干不了
+  // 崩溃：每个人崩法不一样
   G.survivors.forEach(p => {
     const limit = p.bond < 30 ? 80 : 100;
     if (!p.alive || p.stress < limit) return;
     p.stress = 60;
-    G.points = Math.max(0, G.points - 1);
-    log(p.name + " 撑不住了，砸了东西。今天大家都不太想动，行动点 -1。", "bad");
+    const c = CRASH[p.name];
+    if (c) {
+      c.apply(G.res, G);
+      clampAll();
+      log(p.name + " 撑不住了，开始" + c.act + "。" + c.text, "bad");
+    } else {
+      G.points = Math.max(0, G.points - 1);
+      log(p.name + " 撑不住了。", "bad");
+    }
   });
 
   if (s.food <= 0) {
@@ -616,6 +680,42 @@ function end(title, text) {
 document.getElementById("pause").addEventListener("click", () => {
   G.paused = !G.paused;
   render();
+});
+
+// ---------- 主动结束 ----------
+function chooseEnding(kind) {
+  document.getElementById("choice").classList.remove("show");
+  if (kind === "cancel" || G.over) return;
+  const n = alive().length;
+  if (kind === "evac") {
+    if (G.res.power < 40 || G.res.material < 60) {
+      log("出口打不开：要 40 电、60 材料。", "warn");
+      return;
+    }
+    G.res.power -= 40;
+    G.res.material -= 60;
+    end("撤离", "第 " + G.day + " 天，带着 " + n + " 个人往外走。什么都没带，只带了彼此。");
+  } else if (kind === "seal") {
+    if (G.res.power < 60) {
+      log("电不够，冻不起来：要 60 电。", "warn");
+      return;
+    }
+    G.res.power -= 60;
+    end("封存", "第 " + G.day + " 天，把 " + n + " 个人一个一个送进冷柜。等以后有人来。");
+  } else if (kind === "log") {
+    end("留档", "第 " + G.day + " 天，把这段日子写完了。写到最后一句的时候，还剩 " + n + " 个人。");
+  } else if (kind === "stop") {
+    end("停在这里", "第 " + G.day + " 天。没有解释。");
+  }
+}
+
+document.getElementById("quit").addEventListener("click", () => {
+  if (G.over) return;
+  document.getElementById("choice").classList.add("show");
+});
+
+document.querySelectorAll("#choice button").forEach(b => {
+  b.addEventListener("click", () => chooseEnding(b.dataset.c));
 });
 
 document.getElementById("next").addEventListener("click", nextDay);
