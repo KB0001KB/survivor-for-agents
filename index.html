@@ -325,7 +325,7 @@ const BAL = {
 };
 
 const ACTIONS = [
-  { id:"oxy",  name:"修氧机", sub:"+30 氧 / -10 材料 / -8 电", run(s){
+  { id:"oxy",  name:"修氧机", sub:"+30 氧 / -10 材料 / -8 电", mat:10, run(s){
       const gain = 30 + (G.techLevel >= 1 ? 10 : 0);
       s.oxygen += gain; s.material -= 10; s.power -= 8;
       return "修了氧机，氧气 +" + gain + "，材料 -10，电力 -8";
@@ -338,7 +338,7 @@ const ACTIONS = [
       s.food += 30; s.water -= 8;
       return "种了一批，食物 +30，水 -8";
   }},
-  { id:"power",name:"发电", sub:"+30 电 / -15 材料", run(s){
+  { id:"power",name:"发电", sub:"+30 电 / -15 材料", mat:15, run(s){
       const gain = 30 + (G.techLevel >= 2 ? 10 : 0);
       s.power += gain; s.material -= 15;
       return "烧料发电，电力 +" + gain + "，材料 -15";
@@ -358,7 +358,7 @@ const ACTIONS = [
       g.survivors.forEach(p => { if (p.alive) p.stress = Math.max(0, p.stress - 10); });
       return "大家凑在一起说了会儿话，所有人压力 -10";
   }},
-  { id:"apply",name:"应用研究", sub:"-15 材料 / +1 科技", run(s){
+  { id:"apply",name:"应用研究", sub:"-15 材料 / +1 科技", mat:15, run(s){
       s.material -= 15;
       G.tech += 1;
       const need = BAL.techPerLevel;
@@ -370,7 +370,7 @@ const ACTIONS = [
       }
       return "拆了改、改了拆，攒了点东西。科技 +1（" + G.tech + "/" + need + "）";
   }},
-  { id:"study",name:"基础理论", sub:"-12 材料", run(s){
+  { id:"study",name:"基础理论", sub:"-12 材料", mat:12, run(s){
       s.material -= 12;
       G.theory += 1;
       G.theoryTotal += 1;
@@ -1109,7 +1109,7 @@ function render() {
 
   const acts = document.getElementById("actions");
   acts.innerHTML = ACTIONS.map(a =>
-    '<button class="act" data-id="' + a.id + '"' + (canAct() && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
+    '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
     a.name + '<small>' + a.sub + '</small></button>'
   ).join("");
   acts.querySelectorAll("button").forEach(b => {
@@ -1128,6 +1128,13 @@ function render() {
 
 function canAct() {
   return !G.over && !G.paused && G.points > 0;
+}
+
+// 材料不够就点不动。
+// 不然材料归零之后，clamp 把它按回 0，可动作照样结算——修氧机免费、笔记免费，
+// 这局就再也没有输的可能了。
+function tooPoor(a) {
+  return a.mat ? G.res.material < a.mat : false;
 }
 
 // ---------- 和一个人说话 ----------
@@ -1152,6 +1159,7 @@ function doAction(id) {
   if (!canAct()) return;
   const a = ACTIONS.find(x => x.id === id);
   if (!a) return;
+  if (tooPoor(a)) { log("材料不够，" + a.name + "做不了。", "warn"); return; }
   const text = a.run(G.res, G);
   G.points -= 1;
   clampAll();
