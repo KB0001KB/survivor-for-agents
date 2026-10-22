@@ -11,12 +11,24 @@
     --ok:#3fb950; --warn:#d29922; --bad:#f85149;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
   body{
     background:var(--bg); color:var(--text);
     font-family:"Consolas","Courier New",monospace;
     font-size:14px; line-height:1.5;
     user-select:none; overflow:hidden;
+    display:flex; flex-direction:column;
   }
+
+  /* 上半：界面。AI 只截这一块。 */
+  #ui{ flex:none; position:relative; z-index:2; }
+
+  /* 下半：场景。给人看的。 */
+  #scene{
+    flex:1; min-height:220px; position:relative; overflow:hidden;
+    background:#070a0e; border-top:1px solid var(--line);
+  }
+  #scene svg{ position:absolute; inset:0; display:block; width:100%; height:100%; }
 
   #grid{
     position:fixed; inset:0; pointer-events:none; z-index:999;
@@ -100,8 +112,7 @@
   }
 
   #log{
-    margin:0 12px 12px; height:calc(100vh - 44px - 34px - 190px - 52px - 44px - 60px);
-    min-height:120px; overflow-y:auto;
+    margin:0 12px 12px; height:96px; overflow-y:auto;
     background:#0b0f14; border:1px solid var(--line); border-radius:6px;
     padding:10px; font-size:12.5px; line-height:1.7;
   }
@@ -164,6 +175,8 @@
 
 <div id="grid"></div>
 
+<div id="ui">
+
 <div id="bar">
   <div class="res"><span class="k">氧气</span><span class="v" id="r-oxygen">100</span><span class="d" id="d-oxygen"></span></div>
   <div class="res"><span class="k">水</span><span class="v" id="r-water">100</span><span class="d" id="d-water"></span></div>
@@ -189,6 +202,10 @@
 <button id="next">结束今天</button>
 
 <div id="log"></div>
+
+</div><!-- /#ui -->
+
+<div id="scene"><svg id="sceneSvg" viewBox="0 0 1264 320" preserveAspectRatio="xMidYMax slice"></svg></div>
 
 <div id="choice"><div class="box">
   <h2>宣布结束</h2>
@@ -622,6 +639,135 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 }
 
+// ---------- 场景（只给人看，不参与判定） ----------
+const SCENE = { GROUND: 290, xs: [245, 480, 700, 930] };
+
+function lastBubble() {
+  for (let i = G.log.length - 1; i >= 0; i--) {
+    const l = G.log[i];
+    if (!l.cls && l.text.indexOf("：") > 0) {
+      const k = l.text.indexOf("：");
+      return { who: l.text.slice(0, k), say: l.text.slice(k + 1) };
+    }
+  }
+  return null;
+}
+
+function renderScene() {
+  const svg = document.getElementById("sceneSvg");
+  if (!svg) return;
+  const s = G.res;
+  const lv = v => v <= 15 ? "#f85149" : v <= 35 ? "#d29922" : "#3fb950";
+  const G0 = SCENE.GROUND;
+  const p = [];
+
+  // 岩层、顶灯、地面
+  p.push('<rect width="1264" height="320" fill="#070a0e"/>');
+  p.push('<path d="M0 16 H1264" stroke="#151b23" stroke-width="2"/>');
+  p.push('<path d="M0 21 H1264" stroke="#10161d" stroke-width="1"/>');
+  [320, 700, 1080].forEach(function (lx) {
+    p.push('<path d="M' + lx + ' 16 V40" stroke="#1a212a" stroke-width="2"/>');
+    p.push('<rect x="' + (lx - 15) + '" y="40" width="30" height="7" rx="3" fill="#2b3542"/>');
+    p.push('<circle cx="' + lx + '" cy="50" r="3" fill="#d29922" opacity=".75"/>');
+    p.push('<path d="M' + (lx - 14) + ' 52 L' + (lx + 14) + ' 52 L' + (lx + 46) + ' 96 L' + (lx - 46) + ' 96 Z" fill="#d29922" opacity=".04"/>');
+  });
+  p.push('<rect y="' + (G0 + 2) + '" width="1264" height="30" fill="#0c1116"/>');
+  p.push('<path d="M0 ' + G0 + ' H1264" stroke="#242c36" stroke-width="2"/>');
+  [[120, 306], [360, 312], [600, 304], [850, 314], [1100, 307], [1210, 312]].forEach(function (q) {
+    p.push('<ellipse cx="' + q[0] + '" cy="' + q[1] + '" rx="10" ry="3" fill="#141a22"/>');
+  });
+
+  // 制氧机
+  const oxyC = lv(s.oxygen);
+  p.push('<rect x="40" y="110" width="170" height="180" rx="10" fill="#121820" stroke="#252d38"/>');
+  p.push('<rect x="58" y="126" width="134" height="7" rx="3" fill="#1d2530"/>');
+  p.push('<circle cx="105" cy="198" r="34" fill="#0a0e13" stroke="' + oxyC + '" stroke-width="3"/>');
+  p.push('<g stroke="' + oxyC + '" stroke-width="4" stroke-linecap="round" opacity=".9">');
+  p.push('<path d="M105 176 V220"/><path d="M84 186 L126 210"/><path d="M126 186 L84 210"/></g>');
+  p.push('<path d="M162 110 V70 H200" stroke="#2b3542" stroke-width="7" fill="none"/>');
+
+  // 农田
+  const foodC = lv(s.food);
+  p.push('<rect x="290" y="240" width="160" height="50" rx="6" fill="#171310"/>');
+  for (let i = 0; i < 5; i++) {
+    const x = 308 + i * 32;
+    p.push('<path d="M' + x + ' 286 q -11 -22 0 -38" stroke="' + foodC + '" stroke-width="3.5" fill="none"/>');
+    p.push('<path d="M' + x + ' 278 q 12 -15 19 -20" stroke="' + foodC + '" stroke-width="3.5" fill="none"/>');
+  }
+
+  // 水箱
+  const wH = Math.max(0, Math.min(174, Math.round(174 * Math.min(100, s.water) / 100)));
+  p.push('<rect x="500" y="110" width="170" height="180" rx="10" fill="#0a0e13" stroke="#252d38"/>');
+  if (wH > 0) {
+    p.push('<rect x="507" y="' + (285 - wH) + '" width="156" height="' + wH + '" rx="5" fill="#1f6feb" opacity=".45"/>');
+    p.push('<path d="M507 ' + (285 - wH) + ' q 39 -6 78 0 t 78 0" stroke="#58a6ff" stroke-width="2" fill="none" opacity=".75"/>');
+  }
+
+  // 发电机
+  const powC = lv(s.power);
+  p.push('<rect x="720" y="130" width="170" height="160" rx="10" fill="#121820" stroke="#252d38"/>');
+  p.push('<circle cx="782" cy="210" r="30" fill="#0a0e13" stroke="' + powC + '" stroke-width="3"/>');
+  p.push('<g stroke="' + powC + '" stroke-width="4" stroke-linecap="round">');
+  p.push('<path d="M782 190 V230"/><path d="M762 210 H802"/><path d="M768 196 L796 224"/><path d="M796 196 L768 224"/></g>');
+  p.push('<path d="M840 160 V120 h18" stroke="#2b3542" stroke-width="6" fill="none"/>');
+
+  // 矿道
+  p.push('<path d="M950 290 A 90 90 0 0 1 1130 290 Z" fill="#030507"/>');
+  p.push('<path d="M950 290 A 90 90 0 0 1 1130 290" stroke="#2b3542" stroke-width="3" fill="none"/>');
+  if (s.material <= 15) {
+    p.push('<path d="M980 232 L1010 254 L1000 278" stroke="#f85149" stroke-width="2.5" fill="none" opacity=".7"/>');
+  }
+  p.push('<text x="1040" y="310" text-anchor="middle" fill="#4b5563" font-size="12">矿道</text>');
+
+  // 人
+  SCENE.xs.forEach(function (x, i) {
+    const who = G.survivors[i];
+    if (!who) return;
+    if (!who.alive) {
+      p.push('<g opacity=".3">');
+      p.push('<rect x="' + (x - 30) + '" y="' + (G0 - 12) + '" width="60" height="9" rx="3" fill="#252d38"/>');
+      p.push('<rect x="' + (x - 30) + '" y="' + (G0 - 26) + '" width="16" height="13" rx="3" fill="#2b3542"/>');
+      p.push('<rect x="' + (x + 8) + '" y="' + (G0 - 16) + '" width="22" height="4" rx="2" fill="#1d2530"/>');
+      p.push('</g>');
+      p.push('<text x="' + x + '" y="' + (G0 + 20) + '" text-anchor="middle" fill="#4b5563" font-size="11">' +
+        (who.left ? "走了" : "空床") + '</text>');
+      return;
+    }
+    const st = who.stress;
+    const lean = st >= 60 ? 9 : st >= 30 ? 4 : 0;
+    const col = st >= 80 ? "#f85149" : st >= 60 ? "#d29922" : "#9aa4b1";
+    p.push('<g transform="translate(' + x + ',' + G0 + ') rotate(' + lean + ')">');
+    p.push('<path d="M-8 -14 V0 M8 -14 V0" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/>');
+    p.push('<rect x="-15" y="-56" width="30" height="44" rx="10" fill="' + col + '"/>');
+    p.push('<circle cx="0" cy="-70" r="13" fill="' + col + '"/>');
+    p.push('<circle cx="-4.5" cy="-72" r="2" fill="#0a0e13"/><circle cx="4.5" cy="-72" r="2" fill="#0a0e13"/>');
+    p.push('</g>');
+    p.push('<text x="' + x + '" y="' + (G0 + 20) + '" text-anchor="middle" fill="#6e7681" font-size="11">' +
+      escapeHtml(who.name) + '</text>');
+  });
+
+  // 气泡
+  const b = lastBubble();
+  if (b) {
+    const idx = G.survivors.findIndex(function (q) { return q.name === b.who; });
+    if (idx >= 0 && G.survivors[idx].alive) {
+      const x = SCENE.xs[idx];
+      let say = b.say;
+      if (say.length > 20) say = say.slice(0, 20) + "…";
+      const bw = Math.max(84, say.length * 13 + 24);
+      const bx = Math.max(10, Math.min(1264 - bw - 10, x - bw / 2));
+      const by = 158;
+      p.push('<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="28" rx="14" fill="#e6edf3" opacity=".95"/>');
+      p.push('<path d="M' + (x - 6) + ' ' + (by + 27) + ' L' + x + ' ' + (by + 40) + ' L' + (x + 6) + ' ' + (by + 27) +
+        '" fill="#e6edf3" opacity=".95"/>');
+      p.push('<text x="' + (bx + bw / 2) + '" y="' + (by + 19) + '" text-anchor="middle" fill="#0d1117" font-size="12">' +
+        escapeHtml(say) + '</text>');
+    }
+  }
+
+  svg.innerHTML = p.join("");
+}
+
 // ---------- 渲染 ----------
 function clampAll() {
   const s = G.res;
@@ -699,6 +845,7 @@ function render() {
   document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
   document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
   renderLog();
+  renderScene();
   saveRun();
 }
 

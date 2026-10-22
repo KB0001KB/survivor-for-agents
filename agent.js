@@ -108,8 +108,11 @@ async function main() {
   let prevHash = "";
   let stuck = 0;
 
+  // 只看界面那半张（下面场景是给人看的，喂给模型只会分心）
+  const view = (await page.$("#ui")) || page;
+
   for (let i = 1; i <= steps; i++) {
-    const b64 = await page.screenshot({ encoding: "base64" });
+    const b64 = await view.screenshot({ encoding: "base64" });
     fs.writeFileSync(path.join(__dirname, "shots", "agent-" + String(i).padStart(3, "0") + ".png"), b64, "base64");
 
     const hash = crypto.createHash("md5").update(b64).digest("hex");

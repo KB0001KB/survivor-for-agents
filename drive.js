@@ -21,8 +21,12 @@ async function main() {
 
     if (cmd === "shot") {
       const out = a || "shot.png";
-      await page.screenshot({ path: out });
-      console.log("shot -> " + out);
+      // 第三个参数给 ui 时，只截界面上半部分（不含下面给人看的场景）
+      let el = null;
+      if (b === "ui") el = await page.$("#ui");
+      if (el) await el.screenshot({ path: out });
+      else await page.screenshot({ path: out });
+      console.log("shot -> " + out + (el ? " (#ui)" : ""));
     } else if (cmd === "click") {
       await page.mouse.click(Number(a), Number(b));
       console.log("click " + a + "," + b);
@@ -32,10 +36,22 @@ async function main() {
     } else if (cmd === "size") {
       const dim = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
       console.log(JSON.stringify(dim));
+    } else if (cmd === "window") {
+      const cdp = await page.target().createCDPSession();
+      let done = false;
+      try {
+        const { windowId } = await cdp.send("Browser.getWindowForTarget");
+        await cdp.send("Browser.setWindowBounds", {
+          windowId, bounds: { width: Number(a), height: Number(b) },
+        });
+        done = true;
+      } catch (e) { /* headless 下没有真实窗口 */ }
+      if (!done) await page.setViewport({ width: Number(a), height: Number(b) });
+      console.log("window " + a + "x" + b + (done ? "" : " (via viewport)"));
     } else if (cmd === "url") {
       console.log(page.url());
     } else if (cmd === "reload") {
-      await page.reload({ waitUntil: "load" });
+      await page.reload({ waitUntil: "load", ignoreCache: true });
       console.log("reloaded");
     } else if (cmd === "clear") {
       await page.evaluate(() => localStorage.clear());
