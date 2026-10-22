@@ -141,6 +141,7 @@
     border-radius:6px; padding:8px; cursor:pointer; font-family:inherit; font-size:12px;
   }
   #choice .restart:hover{ border-color:var(--bad); color:var(--bad); }
+  #choiceMsg{ min-height:18px; color:var(--bad); font-size:12px; margin-bottom:10px; }
 
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
@@ -198,6 +199,7 @@
     <button data-c="log">留档<small>把这段日子写完</small></button>
     <button data-c="stop">停在这里<small>不解释</small></button>
   </div>
+  <div id="choiceMsg"></div>
   <button class="restart" data-c="restart">重新开始这一局（现在这些人会没）</button>
   <button class="cancel" data-c="cancel">算了，继续</button>
 </div></div>
@@ -806,31 +808,45 @@ document.getElementById("pause").addEventListener("click", () => {
 
 // ---------- 主动结束 ----------
 function chooseEnding(kind) {
-  document.getElementById("choice").classList.remove("show");
-  if (kind === "cancel" || G.over) return;
+  const msg = document.getElementById("choiceMsg");
+  if (msg) msg.textContent = "";
+
+  if (kind === "cancel" || G.over) {
+    document.getElementById("choice").classList.remove("show");
+    return;
+  }
+  if (kind === "restart") {
+    try { localStorage.removeItem(RUN_KEY); } catch (e) {}
+    location.reload();
+    return;
+  }
+
   const n = alive().length;
+  const fail = (text) => { if (msg) msg.textContent = text; };
+
   if (kind === "evac") {
     if (G.res.power < 40 || G.res.material < 60) {
-      log("出口打不开：要 40 电、60 材料。", "warn");
+      fail("出口打不开：要 40 电、60 材料。现在只有 " + Math.round(G.res.power) + " 电、" + Math.round(G.res.material) + " 材料。");
       return;
     }
     G.res.power -= 40;
     G.res.material -= 60;
+    document.getElementById("choice").classList.remove("show");
     end("撤离", "第 " + G.day + " 天，带着 " + n + " 个人往外走。什么都没带，只带了彼此。");
   } else if (kind === "seal") {
     if (G.res.power < 60) {
-      log("电不够，冻不起来：要 60 电。", "warn");
+      fail("电不够，冻不起来：要 60 电，现在只有 " + Math.round(G.res.power) + " 电。");
       return;
     }
     G.res.power -= 60;
+    document.getElementById("choice").classList.remove("show");
     end("封存", "第 " + G.day + " 天，把 " + n + " 个人一个一个送进冷柜。等以后有人来。");
   } else if (kind === "log") {
+    document.getElementById("choice").classList.remove("show");
     end("留档", "第 " + G.day + " 天，把这段日子写完了。写到最后一句的时候，还剩 " + n + " 个人。");
   } else if (kind === "stop") {
+    document.getElementById("choice").classList.remove("show");
     end("停在这里", "第 " + G.day + " 天。没有解释。");
-  } else if (kind === "restart") {
-    try { localStorage.removeItem(RUN_KEY); } catch (e) {}
-    location.reload();
   }
 }
 
