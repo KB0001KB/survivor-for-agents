@@ -73,6 +73,8 @@
     border-bottom:1px solid var(--line); color:var(--dim); font-size:13px;
   }
   #points{color:var(--accent);}
+  #hint{color:var(--warn); font-size:12px;}
+  #hint.bad{color:var(--bad); font-weight:600;}
 
   #people{
     display:grid; grid-template-columns:repeat(4,1fr);
@@ -325,16 +327,16 @@ const BAL = {
 };
 
 const ACTIONS = [
-  { id:"oxy",  name:"修氧机", sub:"+30 氧 / -10 材料 / -8 电", mat:10, run(s){
+  { id:"oxy",  name:"修氧机", sub:"+30 氧 / -10 材料 / -8 电", mat:10, pw:1, run(s){
       const gain = 30 + (G.techLevel >= 1 ? 10 : 0);
       s.oxygen += gain; s.material -= 10; s.power -= 8;
       return "修了氧机，氧气 +" + gain + "，材料 -10，电力 -8";
   }},
-  { id:"water",name:"打水", sub:"+30 水 / -6 电", run(s){
+  { id:"water",name:"打水", sub:"+30 水 / -6 电", pw:1, run(s){
       s.water += 30; s.power -= 6;
       return "打了水，水 +30，电力 -6";
   }},
-  { id:"farm", name:"种植", sub:"+30 食物 / -8 水", run(s){
+  { id:"farm", name:"种植", sub:"+30 食物 / -8 水", pw:1, run(s){
       s.food += 30; s.water -= 8;
       return "种了一批，食物 +30，水 -8";
   }},
@@ -630,6 +632,7 @@ function fresh() {
   G.badStreak = 0;
   G.remedy = null;
   G.ask = null;
+  G.blackout = 0;
   // 每次从池子里抽四个，不是固定的那几位
   const picked = NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
   G.survivors = picked.map(n => ({
@@ -658,6 +661,7 @@ function saveRun() {
       rollCallPending: G.rollCallPending, lastOneLogged: G.lastOneLogged, awakened: G.awakened,
       posts: G.posts,
       badStreak: G.badStreak, remedy: G.remedy, broken: G.broken,
+      blackout: G.blackout || 0,
       log: G.log.slice(-120),
       over: G.over,
     }));
@@ -688,6 +692,7 @@ function loadRun() {
     G.badStreak = d.badStreak || 0;
     G.remedy = d.remedy || null;
     G.broken = d.broken || {};
+    G.blackout = d.blackout || 0;
     G.log = d.log || [];
     G.over = false;
     return true;
@@ -1108,8 +1113,10 @@ function render() {
   });
 
   const acts = document.getElementById("actions");
+  // 发电之后当场就能开机，不用等第二天
+  const dark = (G.blackout || 0) >= 2 && G.res.power <= 0;
   acts.innerHTML = ACTIONS.map(a =>
-    '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
+    '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
     a.name + '<small>' + a.sub + '</small></button>'
   ).join("");
   acts.querySelectorAll("button").forEach(b => {
@@ -1118,7 +1125,11 @@ function render() {
 
   document.getElementById("next").disabled = G.over || G.paused;
   document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
-  document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
+  const hint = document.getElementById("hint");
+  hint.textContent = G.paused ? "已暂停"
+    : (dark ? "停电了。发电才能重启机器。"
+    : ((G.blackout || 0) === 1 ? "余电只够今天。" : ""));
+  hint.className = dark ? "bad" : "";
   renderLog();
   renderRemedy();
   renderAsk();
@@ -1160,6 +1171,7 @@ function doAction(id) {
   const a = ACTIONS.find(x => x.id === id);
   if (!a) return;
   if (tooPoor(a)) { log("材料不够，" + a.name + "做不了。", "warn"); return; }
+  if ((G.blackout || 0) >= 2 && G.res.power <= 0 && a.pw) { log("停电了，" + a.name + "开不动。", "warn"); return; }
   const text = a.run(G.res, G);
   G.points -= 1;
   clampAll();
@@ -1429,6 +1441,9 @@ function nextDay() {
   }
 
   clampAll();
+
+  // 电归零不立刻停机，先给一天。第二天还黑着，才算真停电。
+  G.blackout = (s.power <= 0) ? (G.blackout || 0) + 1 : 0;
 
   // 缺氧
   if (s.oxygen <= 0) {
