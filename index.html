@@ -119,6 +119,11 @@
     width:100%; height:44px; margin:0 12px 12px; width:calc(100% - 24px);
     border-color:var(--accent); color:var(--accent); font-size:15px;
   }
+  /* 行动点用完了，让这一行变样——不然分不清"今天做完了"和"今天还没动" */
+  #next.ready{
+    border-color:var(--ok); color:var(--ok); background:#16241c;
+    font-weight:600;
+  }
 
   #night{
     margin:0 12px 6px; height:34px; display:flex; align-items:center; gap:10px;
@@ -1091,7 +1096,7 @@ function render() {
     if (el) el.textContent = "-" + Math.round(pair[1] * dm) + "/天";
   });
   document.getElementById("day").textContent = G.day;
-  document.getElementById("points").textContent = G.points;
+  document.getElementById("points").textContent = G.points + " / " + BAL.pointsPerDay;
   document.getElementById("tech").textContent =
     "科技 " + G.techLevel + " 级" + (G.tech > 0 ? "（" + G.tech + "/" + BAL.techPerLevel + "）" : "");
 
@@ -1137,7 +1142,11 @@ function render() {
     b.addEventListener("click", () => doAction(b.dataset.id));
   });
 
-  document.getElementById("next").disabled = G.over || G.paused;
+  const next = document.getElementById("next");
+  const done = G.points <= 0 && !G.over && !G.paused;
+  next.disabled = G.over || G.paused;
+  next.textContent = done ? "今天做完了 · 结束今天" : "结束今天";
+  next.classList.toggle("ready", done);
   document.getElementById("pause").textContent = G.paused ? "▶" : "⏸";
   const hint = document.getElementById("hint");
   hint.textContent = G.paused ? "已暂停"
