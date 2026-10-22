@@ -1460,8 +1460,6 @@ function nextDay() {
   G.remedy = null;
   G.ask = null;
 
-  if (!G.awakened && G.theoryTotal >= BAL.revealAt) awaken();
-
   const s = G.res;
   const pop = Math.max(1, alive().length);
   // 人少了，消耗就小。四个人时是满额，一个人时只剩四分之一。
@@ -1525,6 +1523,9 @@ function nextDay() {
     checkEnd();
     return;
   }
+
+  // 没人看着的时候，那本书先合上。全灭的局不算数。
+  if (!G.awakened && G.theoryTotal >= BAL.revealAt) awaken();
 
   G.day += 1;
   G.points = BAL.pointsPerDay;
