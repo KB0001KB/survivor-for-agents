@@ -625,16 +625,24 @@ function nextDay() {
     G.oxygenDays = 0;
   }
 
-  // 虚弱
-  const a = alive();
-  if (a.length === 0) {
-    end("全灭了", "最后一天是第 " + G.day + " 天。氧气归零，没有人活下来。");
+  // 没人了：可能是全灭，也可能是都圆梦走了
+  if (alive().length === 0) {
+    checkEnd();
     return;
   }
 
   G.day += 1;
   G.points = BAL.pointsPerDay;
   G.survivors.forEach(p => { p.talked = false; });
+
+  // 士气跟着整体压力走，太低会拖垮所有人
+  const living = alive();
+  const avg = living.length ? living.reduce((sum, p) => sum + p.stress, 0) / living.length : 0;
+  s.morale = Math.max(0, Math.round(100 - avg));
+  if (s.morale < 30) {
+    G.survivors.forEach(p => { if (p.alive) p.stress += 2; });
+    log("屋里没什么人说话了。所有人压力 +2。", "warn");
+  }
 
   // 有人没了，第二天点名会少一个
   if (G.rollCallPending) {
