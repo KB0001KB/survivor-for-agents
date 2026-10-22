@@ -174,6 +174,29 @@
   #choice .restart:hover{ border-color:var(--bad); color:var(--bad); }
   #choiceMsg{ min-height:18px; color:var(--bad); font-size:12px; margin-bottom:10px; }
 
+  #ask{
+    position:fixed; inset:0; background:rgba(0,0,0,.78); display:none;
+    align-items:center; justify-content:center; z-index:60;
+  }
+  #ask.show{ display:flex; }
+  #ask .box{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:26px 32px; max-width:460px; text-align:center;
+  }
+  #ask #askText{ color:var(--text); line-height:1.8; margin-bottom:10px; }
+  #ask .note{ color:var(--bad); font-size:12px; margin-bottom:20px; }
+  #ask .row{ display:flex; gap:12px; justify-content:center; }
+  #ask button{
+    height:34px; padding:0 22px; border-radius:6px; cursor:pointer;
+    font-family:inherit; font-size:13px;
+    background:#21262d; border:1px solid var(--line); color:var(--text);
+  }
+  #ask #askOk{ border-color:var(--bad); color:var(--bad); }
+  #ask button:hover{ background:#30363d; }
+  .mach{ cursor:pointer; transition:filter .15s, opacity .3s; }
+  .mach:hover{ filter:brightness(1.4); }
+  .mach.dead{ opacity:.4; filter:grayscale(1); pointer-events:none; }
+
   #over{
     position:fixed; inset:0; background:rgba(0,0,0,.82);
     display:none; align-items:center; justify-content:center;
@@ -241,6 +264,12 @@
   <div id="choiceMsg"></div>
   <button class="restart" data-c="restart">重新开始这一局（现在这些人会没）</button>
   <button class="cancel" data-c="cancel">算了，继续</button>
+</div></div>
+
+<div id="ask"><div class="box">
+  <p id="askText"></p>
+  <div class="note" id="askNote"></div>
+  <div class="row"><button id="askOk">拆</button><button id="askNo">算了</button></div>
 </div></div>
 
 <div id="over"><div class="box">
@@ -561,6 +590,10 @@ function fresh() {
   G.rollCallPending = false;
   G.awakened = false;
   G.posts = [null, null, null, null];
+  G.broken = {};
+  G.badStreak = 0;
+  G.remedy = null;
+  G.ask = null;
   // 每次从池子里抽四个，不是固定的那几位
   const picked = NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
   G.survivors = picked.map(n => ({
@@ -588,7 +621,7 @@ function saveRun() {
       oxygenDays: G.oxygenDays, foodDays: G.foodDays, waterDays: G.waterDays,
       rollCallPending: G.rollCallPending, lastOneLogged: G.lastOneLogged, awakened: G.awakened,
       posts: G.posts,
-      badStreak: G.badStreak, remedy: G.remedy,
+      badStreak: G.badStreak, remedy: G.remedy, broken: G.broken,
       log: G.log.slice(-120),
       over: G.over,
     }));
@@ -618,6 +651,7 @@ function loadRun() {
     G.posts = Array.isArray(d.posts) ? d.posts : [null, null, null, null];
     G.badStreak = d.badStreak || 0;
     G.remedy = d.remedy || null;
+    G.broken = d.broken || {};
     G.log = d.log || [];
     G.over = false;
     return true;
@@ -786,21 +820,27 @@ function buildScene() {
     '<path d="M162 110 V70 H200" stroke="#2b3542" stroke-width="7" fill="none"/>' +
 
     // 农田
+    '<g id="m-farm" class="mach">' +
     '<rect x="290" y="222" width="160" height="48" rx="6" fill="#0d0a08" fill-opacity=".85" stroke="#4a3b2a" stroke-width="1.5"/>' +
     '<g id="crop" stroke-width="3.5" fill="none">' + crops + '</g>' +
+    '</g>' +
 
     // 水箱
+    '<g id="m-water" class="mach">' +
     '<rect x="500" y="110" width="170" height="160" rx="10" fill="#080c12" fill-opacity=".82" stroke="#46566a" stroke-width="1.5"/>' +
-    '<rect id="wBody" class="wl" x="507" y="285" width="156" height="0" rx="5" fill="#1f6feb" opacity=".45"/>' +
+    '<rect id="wBody" class="wl" x="507" y="265" width="156" height="0" rx="5" fill="#1f6feb" opacity=".45"/>' +
     '<path id="wWave" class="wl" d="" stroke="#58a6ff" stroke-width="2" fill="none" opacity=".75"/>' +
+    '</g>' +
 
     // 发电机
+    '<g id="m-power" class="mach">' +
     '<rect x="720" y="130" width="170" height="140" rx="10" fill="#080c12" fill-opacity=".82" stroke="#46566a" stroke-width="1.5"/>' +
     '<circle id="pRing" cx="782" cy="210" r="30" fill="#0a0e13" stroke-width="3"/>' +
     '<g id="pFan" class="fan" stroke-width="4" stroke-linecap="round">' +
       '<path d="M782 190 V230"/><path d="M762 210 H802"/>' +
       '<path d="M768 196 L796 224"/><path d="M796 196 L768 224"/></g>' +
     '<path d="M840 160 V120 h18" stroke="#2b3542" stroke-width="6" fill="none"/>' +
+    '</g>' +
 
     // 矿道
     '<path d="M950 270 A 90 90 0 0 1 1130 270 Z" fill="#030507"/>' +
@@ -821,6 +861,13 @@ function buildScene() {
     if (!g) return;
     g.addEventListener("mouseenter", function () { showTip(i); });
     g.addEventListener("mouseleave", hideTip);
+  });
+
+  // 机器可以点：拆了它，把以后换成现在
+  [["farm", "m-farm"], ["water", "m-water"], ["power", "m-power"]].forEach(function (pair) {
+    const g = document.getElementById(pair[1]);
+    if (!g) return;
+    g.addEventListener("click", function () { askTear(pair[0]); });
   });
 }
 
@@ -879,6 +926,12 @@ function updateScene() {
 
   // 矿道
   $("crack").style.display = s.material <= 15 ? "" : "none";
+
+  // 拆掉的机器留在那儿，灰了
+  ["farm", "water", "power"].forEach(function (k) {
+    const g = $("m-" + k);
+    if (g) g.classList.toggle("dead", !!G.broken[k]);
+  });
 
   // 人
   G.survivors.forEach(function (who, i) {
@@ -1020,7 +1073,7 @@ function render() {
 
   const acts = document.getElementById("actions");
   acts.innerHTML = ACTIONS.map(a =>
-    '<button class="act" data-id="' + a.id + '"' + (canAct() ? "" : " disabled") + '>' +
+    '<button class="act" data-id="' + a.id + '"' + (canAct() && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
     a.name + '<small>' + a.sub + '</small></button>'
   ).join("");
   acts.querySelectorAll("button").forEach(b => {
@@ -1032,6 +1085,7 @@ function render() {
   document.getElementById("hint").textContent = G.paused ? "已暂停" : "";
   renderLog();
   renderRemedy();
+  renderAsk();
   renderScene();
   saveRun();
 }
@@ -1237,6 +1291,7 @@ function applyRemedy() {
   Object.keys(r.give).forEach(k => { G.res[k] += r.give[k]; });
   log("补上了。" + costText(r), "ok");
   G.remedy = null;
+  G.ask = null;
   clampAll();
   render();
 }
@@ -1254,9 +1309,59 @@ function renderRemedy() {
   btn.disabled = !canRemedy(r) || G.paused;
 }
 
+// ---------- 拆 ----------
+// 只做一件事：把以后换成现在。不可逆，但随时可以不做。
+const TEAR = {
+  farm:  { name: "农田",   mat: 90, stress: 8, why: "以后不再种地。" },
+  water: { name: "水箱",   mat: 70, stress: 8, why: "以后不再打水。" },
+  power: { name: "发电机", mat: 80, stress: 8, why: "以后不再发电。" },
+};
+
+function canTear(kind) {
+  return !!TEAR[kind] && !G.broken[kind] && !G.over && !G.paused;
+}
+
+function dismantle(kind) {
+  const t = TEAR[kind];
+  if (!canTear(kind)) return;
+  G.broken[kind] = true;
+  G.res.material += t.mat;
+  alive().forEach(p => { p.stress = Math.max(0, p.stress - t.stress); });
+  log("把" + t.name + "拆了。材料 +" + t.mat + "，" + t.why + "所有人压力 -" + t.stress + "。", "bad");
+  clampAll();
+  G.ask = null;
+  render();
+}
+
+function askTear(kind) {
+  const t = TEAR[kind];
+  if (!canTear(kind)) return;
+  G.ask = {
+    kind: kind,
+    text: "拆了" + t.name + "。" + t.why + "换 " + t.mat + " 材料，所有人松一口气。",
+    note: "这个回不去。",
+    ok: "拆",
+  };
+  render();
+}
+
+function renderAsk() {
+  const box = document.getElementById("ask");
+  if (!box) return;
+  if (!G.ask || G.over) { box.classList.remove("show"); return; }
+  box.classList.add("show");
+  document.getElementById("askText").textContent = G.ask.text;
+  document.getElementById("askNote").textContent = G.ask.note;
+  document.getElementById("askOk").textContent = G.ask.ok;
+}
+
 function nextDay() {
   if (G.over || G.paused) return;
   G.posts = [null, null, null, null];
+  G.broken = {};
+  G.badStreak = 0;
+  G.remedy = null;
+  G.ask = null;
 
   if (!G.awakened && G.theoryTotal >= BAL.revealAt) awaken();
 
@@ -1327,6 +1432,7 @@ function nextDay() {
 
   // 昨天那件事，今天就不再是机会了
   G.remedy = null;
+  G.ask = null;
 
   // 夜里出的事
   rollEvent();
@@ -1471,6 +1577,8 @@ document.querySelectorAll("#choice button").forEach(b => {
 });
 
 document.getElementById("nightBtn").addEventListener("click", applyRemedy);
+document.getElementById("askOk").addEventListener("click", () => { if (G.ask) dismantle(G.ask.kind); });
+document.getElementById("askNo").addEventListener("click", () => { G.ask = null; render(); });
 document.getElementById("next").addEventListener("click", nextDay);
 
 // ---------- 启动 ----------
