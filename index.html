@@ -29,6 +29,13 @@
     background:#070a0e; border-top:1px solid var(--line);
   }
   #scene svg{ position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #tip{
+    position:fixed; display:none; z-index:50; pointer-events:none;
+    padding:3px 10px; border-radius:5px; font-size:12.5px; line-height:1.4;
+    background:#0d1117; color:var(--text); border:1px solid var(--line);
+    box-shadow:0 4px 14px rgba(0,0,0,.6); white-space:nowrap;
+  }
+  #tip b{ color:var(--accent); }
 
   #grid{
     position:fixed; inset:0; pointer-events:none; z-index:999;
@@ -206,6 +213,7 @@
 </div><!-- /#ui -->
 
 <div id="scene"><svg id="sceneSvg" viewBox="0 0 1264 320" preserveAspectRatio="xMidYMax slice"></svg></div>
+<div id="tip"></div>
 
 <div id="choice"><div class="box">
   <h2>宣布结束</h2>
@@ -790,6 +798,35 @@ function buildScene() {
       '<path id="bubT" fill="#e6edf3" opacity=".95"/>' +
       '<text id="bubX" text-anchor="middle" fill="#0d1117" font-size="12"></text>' +
     '</g>';
+
+  SCENE.slots.forEach(function (_, i) {
+    const g = document.getElementById("who" + i);
+    if (!g) return;
+    g.addEventListener("mouseenter", function () { showTip(i); });
+    g.addEventListener("mouseleave", hideTip);
+  });
+}
+
+// 名字只在鼠标悬停时出现。AI 截图里没有鼠标，所以它看不见——
+// 这是给人留的，不是给玩家留的。
+function showTip(i) {
+  const g = document.getElementById("who" + i);
+  const tip = document.getElementById("tip");
+  const who = G.survivors[i];
+  if (!g || !tip || !who) return;
+  const st = !who.alive ? (who.left ? " · 走了" : " · 床空着")
+    : who.stress >= 60 ? " · 绷得很紧" : who.stress >= 30 ? " · 有点累" : "";
+  tip.innerHTML = "<b>" + escapeHtml(who.name) + "</b>" + st;
+  tip.style.display = "block";
+  const b = g.getBoundingClientRect();
+  const x = b.left + b.width / 2 - tip.offsetWidth / 2;
+  tip.style.left = Math.max(8, Math.min(innerWidth - tip.offsetWidth - 8, x)) + "px";
+  tip.style.top = (b.top - 22) + "px";
+}
+
+function hideTip() {
+  const tip = document.getElementById("tip");
+  if (tip) tip.style.display = "none";
 }
 
 function updateScene() {
