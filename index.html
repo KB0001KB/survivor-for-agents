@@ -119,10 +119,10 @@
     width:100%; height:44px; margin:0 12px 12px; width:calc(100% - 24px);
     border-color:var(--accent); color:var(--accent); font-size:15px;
   }
-  /* 行动点用完了，让这一行变样——不然分不清"今天做完了"和"今天还没动" */
+  /* 行动点用完了，让这一行变成一条实心亮绿——不然分不清"今天做完了"和"今天还没动" */
   #next.ready{
-    border-color:var(--ok); color:var(--ok); background:#16241c;
-    font-weight:600;
+    background:var(--ok); border-color:var(--ok); color:#0b1017;
+    font-weight:700; letter-spacing:.5px;
   }
 
   #night{
@@ -1139,10 +1139,14 @@ function render() {
   const acts = document.getElementById("actions");
   // 发电之后当场就能开机，不用等第二天
   const dark = (G.blackout || 0) >= 2 && G.res.power <= 0;
-  acts.innerHTML = ACTIONS.map(a =>
-    '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
-    a.name + '<small>' + a.sub + '</small></button>'
-  ).join("");
+  acts.innerHTML = ACTIONS.map(a => {
+    // 提示写在日志里没人看，就写在按钮自己身上
+    const sub = (a.id === "study" && G.theoryTotal >= 6)
+      ? "-12 材料 · 有半页是别人写的"
+      : a.sub;
+    return '<button class="act" data-id="' + a.id + '"' + (canAct() && !tooPoor(a) && !(dark && a.pw) && !(G.broken && G.broken[a.id]) ? "" : " disabled") + '>' +
+      a.name + '<small>' + sub + '</small></button>';
+  }).join("");
   acts.querySelectorAll("button").forEach(b => {
     b.addEventListener("click", () => doAction(b.dataset.id));
   });
@@ -1516,6 +1520,11 @@ function nextDay() {
   G.day += 1;
   G.points = BAL.pointsPerDay;
   G.survivors.forEach(p => { p.talked = false; });
+
+  // 那行铅笔字不是给人看一遍就完了。每四天再摆到眼前一次。
+  if (G.theoryTotal >= 6 && G.day % 4 === 1) {
+    log("（床头那本笔记还翻开着。最后一页的铅笔字：「写够长，是不是就不用天天算还剩几天。」）", "sys");
+  }
 
   // 昨天那件事，今天就不再是机会了
   G.remedy = null;
